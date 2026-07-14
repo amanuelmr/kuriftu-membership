@@ -12,12 +12,12 @@ import (
 )
 
 type Config struct {
-	Port         string
-	DatabaseURL  string
-	JWTSecret    string
-	JWTExpiry    time.Duration
-	CORSOrigins  []string
-	Env          string // "development" | "production"
+	Port        string
+	DatabaseURL string
+	JWTSecret   string
+	JWTExpiry   time.Duration
+	CORSOrigins []string
+	Env         string // "development" | "production"
 }
 
 // Load reads configuration from the environment. It attempts to load a .env

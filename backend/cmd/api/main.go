@@ -53,10 +53,14 @@ func run() error {
 	// Wire dependencies: repository -> service -> handler.
 	queries := repository.New(pool)
 	authMgr := auth.NewManager(cfg.JWTSecret, cfg.JWTExpiry)
-	userSvc := service.NewUserService(queries, authMgr)
-	userHandler := handler.NewUserHandler(userSvc)
 
-	router := handler.Router(authMgr, cfg.CORSOrigins, userHandler)
+	userSvc := service.NewUserService(queries, authMgr)
+	loyaltySvc := service.NewLoyaltyService(pool, queries)
+
+	userHandler := handler.NewUserHandler(userSvc)
+	loyaltyHandler := handler.NewLoyaltyHandler(loyaltySvc)
+
+	router := handler.Router(authMgr, cfg.CORSOrigins, userHandler, loyaltyHandler)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
