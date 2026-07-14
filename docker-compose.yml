@@ -1,0 +1,21 @@
+# Local development dependencies for the Kuriftu Membership backend.
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: kuriftu-postgres
+    environment:
+      POSTGRES_USER: kuriftu
+      POSTGRES_PASSWORD: kuriftu
+      POSTGRES_DB: kuriftu
+    ports:
+      - "5434:5432"
+    volumes:
+      - kuriftu_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kuriftu"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  kuriftu_pgdata:

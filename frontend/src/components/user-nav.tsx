@@ -3,7 +3,7 @@
 import { LogOut, Settings } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import Cookies from "js-cookie"
+import { clearAuth } from "@/lib/auth"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,8 +19,8 @@ export function UserNav() {
   const router = useRouter()
 
   const handleLogout = () => {
-    // Remove the auth_token cookie
-    Cookies.remove("auth_token")
+    // Clear all auth cookies (token + user id)
+    clearAuth()
     // Redirect to home page
     router.push("/")
   }

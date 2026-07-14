@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "sonner"
 import { register as apiRegister } from "@/lib/api"
+import { setAuth } from "@/lib/auth"
 
 const formSchema = z.object({
   fname: z.string().min(2, "First name must be at least 2 characters"),
@@ -58,7 +59,13 @@ export default function RegisterPage() {
   const onSubmit = async (data: FormData) => {
     try {
       setIsLoading(true)
-      await apiRegister(data);
+      const result = await apiRegister(data);
+
+      // Signup returns { token, user }; log the user in immediately so the
+      // survey step (and dashboard) are authenticated.
+      if (result?.token) {
+        setAuth(result.token, result.user?.id ?? "", true)
+      }
 
       toast.success("Registration successful! Please complete our quick survey.")
       router.push("/survey")
