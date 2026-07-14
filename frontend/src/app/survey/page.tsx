@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
+import { submitSurvey } from "@/lib/api"
 
 const surveyFormSchema = z.object({
   visitPurpose: z.enum(["leisure", "business", "both"], {
@@ -46,13 +47,12 @@ export default function SurveyPage() {
 
   const onSubmit = async (data: SurveyFormData) => {
     try {
-        console.log(data)
       setIsLoading(true)
-      // TODO: Add API call to save survey responses
+      await submitSurvey(data)
       toast.success("Thank you for completing the survey!")
-      router.push("/login")
+      router.push("/dashboard")
     } catch (error) {
-        console.error(error)
+      console.error(error)
       toast.error("Failed to submit survey. Please try again.")
     } finally {
       setIsLoading(false)
@@ -61,7 +61,7 @@ export default function SurveyPage() {
 
   const handleSkip = () => {
     toast.info("You can complete the survey later from your profile settings.")
-    router.push("/login")
+    router.push("/dashboard")
   }
 
   return (
