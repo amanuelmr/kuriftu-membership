@@ -18,7 +18,7 @@ export default function Home() {
         <div className="container flex h-16 items-center justify-between">
           <div className="flex items-center gap-2">
             <Image
-              src="https://www.kurifturesorts.com/_nuxt/img/logo.e2cce34.svg"
+              src="/logo.svg"
               alt="Kuriftu Resort Logo"
               width={40}
               height={40}
