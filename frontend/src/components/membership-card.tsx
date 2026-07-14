@@ -4,13 +4,19 @@ import { Award } from "lucide-react"
 interface MembershipCardProps {
   name: string
   memberId: string
-  tier: "Golden" | "Platinum" | "Diamond"
+  tier: "Basic" | "Golden" | "Platinum" | "Diamond"
   since: string
   expiryDate: string
 }
 
 export function MembershipCard({ name, memberId, tier, since, expiryDate }: MembershipCardProps) {
   const tierColors = {
+    Basic: {
+      bg: "bg-gradient-to-r from-neutral-500 to-neutral-600",
+      border: "border-neutral-300",
+      text: "text-white",
+      icon: "text-white",
+    },
     Golden: {
       bg: "bg-gradient-to-r from-amber-500 to-yellow-500",
       border: "border-amber-300",

@@ -188,6 +188,38 @@ export async function updateUserProfile(userData: Partial<User>) {
   }
 }
 
+// Survey
+export interface SurveyData {
+  visitPurpose: string;
+  preferredAccommodation: string[];
+  interests: string[];
+  travelFrequency: string;
+  specialOccasions?: string;
+  additionalNotes?: string;
+}
+
+export async function submitSurvey(survey: SurveyData) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/survey`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${getToken()}`
+      },
+      body: JSON.stringify(survey)
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to submit survey");
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Submit survey error:", error);
+    throw error;
+  }
+}
+
 // Bookings
 export async function getBookings(status?: string): Promise<Booking[]> {
   try {
