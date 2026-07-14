@@ -1,6 +1,9 @@
-// This file contains all API calls to the backend
-// Replace the base URL with your actual backend URL
-const API_BASE_URL = "https://kuriftu-membership-backend-3.onrender.com/api";
+// This file contains all API calls to the backend.
+// The base URL is configured via NEXT_PUBLIC_API_URL (see .env.example).
+import { getToken } from "./auth";
+
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api";
 
 
 // Types for API responses
@@ -427,10 +430,4 @@ export async function getPaymentHistory(): Promise<Payment[]> {
   }
 }
 
-// Helper functions
-function getToken() {
-  if (typeof window !== "undefined") {
-    return localStorage.getItem("token") || "";
-  }
-  return "";
-}
+// getToken is provided by ./auth (single source of truth for the JWT).

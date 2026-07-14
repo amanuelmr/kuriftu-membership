@@ -1,8 +1,8 @@
 'use client'
 import { Award, ShoppingBag, Hotel, Utensils, SpadeIcon as Spa, Users } from "lucide-react"
 import { useEffect, useState } from "react"
-import Cookies from "js-cookie"
 
+import { getPointsBalance } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -18,16 +18,17 @@ export default function PointsPage() {
 
   useEffect(() => {
     const fetchPoints = async () => {
-      const userId = Cookies.get('user_id')
-      const response = await fetch(`https://kuriftu-membership-backend-3.onrender.com/api/loyalty/redeem-points?userId=${userId}`)
-      const data = await response.json()
-      setPoints(data.points)
+      try {
+        const balance = await getPointsBalance()
+        setPoints(balance.available)
+      } catch {
+        // Endpoint not available yet; leave points at 0.
+        setPoints(0)
+      }
     }
-    
+
     fetchPoints()
   }, [])
-
-  console.log(points)
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-neutral-50 to-neutral-100 dark:from-neutral-900 dark:to-neutral-800">

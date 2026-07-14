@@ -8,13 +8,13 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
 import { toast } from "sonner"
-import Cookies from "js-cookie"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { login } from "@/lib/api"
+import { setAuth } from "@/lib/auth"
 
 const formSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -51,15 +51,8 @@ export default function LoginPage() {
       setIsLoading(true)
       const result = await login(data.email, data.password);
 
-      // Store token in cookies
-      if (data.remember) {
-        // Set cookie to expire in 7 days
-        Cookies.set("auth_token", result.token, { expires: 7 })
-        Cookies.set("user_id", result.user, { expires: 7 })
-      } else {
-        // Set session cookie (expires when browser closes)
-        Cookies.set("auth_token", result.token)
-      }
+      // Persist token + user id. `remember` = 7-day cookie vs session cookie.
+      setAuth(result.token, result.user?.id ?? "", data.remember)
 
       toast.success("Login successful!")
       router.push("/dashboard")
