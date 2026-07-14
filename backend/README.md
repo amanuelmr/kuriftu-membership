@@ -74,6 +74,9 @@ Base path `/api`.
 | POST   | `/rewards/redeem` | Bearer | `{rewardId}`; atomic deduct, 422 if short |
 | GET    | `/membership/benefits` | Bearer | tier comparison |
 | POST   | `/membership/upgrade`  | Bearer | `{tier}` → updated user |
+| GET    | `/bookings[?status=]`  | Bearer | user's bookings |
+| GET    | `/offers`              | Bearer | active offers |
+| POST   | `/survey`              | Bearer | upsert onboarding survey |
 
-Remaining endpoints (bookings, offers, survey, payments) are planned — see the
-project plan.
+Remaining endpoints (payment methods + history) are planned — see the project
+plan.

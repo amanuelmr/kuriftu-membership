@@ -56,6 +56,21 @@ func (ns NullMembershipTier) Value() (driver.Value, error) {
 	return string(ns.MembershipTier), nil
 }
 
+type Booking struct {
+	ID        uuid.UUID `json:"id"`
+	UserID    uuid.UUID `json:"user_id"`
+	Title     string    `json:"title"`
+	Location  string    `json:"location"`
+	Image     string    `json:"image"`
+	CheckIn   time.Time `json:"check_in"`
+	CheckOut  time.Time `json:"check_out"`
+	Guests    int32     `json:"guests"`
+	Status    string    `json:"status"`
+	Price     string    `json:"price"`
+	Amenities []string  `json:"amenities"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 type MembershipBenefit struct {
 	ID        int64  `json:"id"`
 	Name      string `json:"name"`
@@ -63,6 +78,16 @@ type MembershipBenefit struct {
 	Platinum  string `json:"platinum"`
 	Diamond   string `json:"diamond"`
 	SortOrder int32  `json:"sort_order"`
+}
+
+type Offer struct {
+	ID          uuid.UUID `json:"id"`
+	Image       string    `json:"image"`
+	Title       string    `json:"title"`
+	Description string    `json:"description"`
+	Expiry      time.Time `json:"expiry"`
+	Discount    string    `json:"discount"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 type PointsTransaction struct {
@@ -93,6 +118,18 @@ type Reward struct {
 	PointsRequired int64     `json:"points_required"`
 	Category       string    `json:"category"`
 	CreatedAt      time.Time `json:"created_at"`
+}
+
+type Survey struct {
+	UserID                 uuid.UUID `json:"user_id"`
+	VisitPurpose           string    `json:"visit_purpose"`
+	PreferredAccommodation []string  `json:"preferred_accommodation"`
+	Interests              []string  `json:"interests"`
+	TravelFrequency        string    `json:"travel_frequency"`
+	SpecialOccasions       string    `json:"special_occasions"`
+	AdditionalNotes        string    `json:"additional_notes"`
+	CreatedAt              time.Time `json:"created_at"`
+	UpdatedAt              time.Time `json:"updated_at"`
 }
 
 type User struct {

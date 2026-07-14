@@ -56,11 +56,13 @@ func run() error {
 
 	userSvc := service.NewUserService(queries, authMgr)
 	loyaltySvc := service.NewLoyaltyService(pool, queries)
+	catalogSvc := service.NewCatalogService(queries)
 
 	userHandler := handler.NewUserHandler(userSvc)
 	loyaltyHandler := handler.NewLoyaltyHandler(loyaltySvc)
+	catalogHandler := handler.NewCatalogHandler(catalogSvc)
 
-	router := handler.Router(authMgr, cfg.CORSOrigins, userHandler, loyaltyHandler)
+	router := handler.Router(authMgr, cfg.CORSOrigins, userHandler, loyaltyHandler, catalogHandler)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
