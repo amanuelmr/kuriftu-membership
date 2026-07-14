@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/amanuelmr/kuriftu-membership/backend/internal/auth"
+	"github.com/amanuelmr/kuriftu-membership/backend/internal/chapa"
 	"github.com/amanuelmr/kuriftu-membership/backend/internal/config"
 	"github.com/amanuelmr/kuriftu-membership/backend/internal/database"
 	"github.com/amanuelmr/kuriftu-membership/backend/internal/handler"
@@ -54,15 +55,27 @@ func run() error {
 	queries := repository.New(pool)
 	authMgr := auth.NewManager(cfg.JWTSecret, cfg.JWTExpiry)
 
+	chapaClient := chapa.New(cfg.ChapaSecretKey, cfg.ChapaBaseURL)
+	if chapaClient.Mock() {
+		slog.Warn("Chapa running in mock mode (no CHAPA_SECRET_KEY set)")
+	}
+
 	userSvc := service.NewUserService(queries, authMgr)
 	loyaltySvc := service.NewLoyaltyService(pool, queries)
 	catalogSvc := service.NewCatalogService(queries)
+	paymentSvc := service.NewPaymentService(
+		queries,
+		chapaClient,
+		cfg.AppBaseURL+"/api/payments/webhook",
+		cfg.FrontendURL+"/dashboard/payments",
+	)
 
 	userHandler := handler.NewUserHandler(userSvc)
 	loyaltyHandler := handler.NewLoyaltyHandler(loyaltySvc)
 	catalogHandler := handler.NewCatalogHandler(catalogSvc)
+	paymentHandler := handler.NewPaymentHandler(paymentSvc)
 
-	router := handler.Router(authMgr, cfg.CORSOrigins, userHandler, loyaltyHandler, catalogHandler)
+	router := handler.Router(authMgr, cfg.CORSOrigins, userHandler, loyaltyHandler, catalogHandler, paymentHandler)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,

@@ -13,21 +13,28 @@ import (
 
 type Querier interface {
 	AddUserPoints(ctx context.Context, arg AddUserPointsParams) (int64, error)
+	ClearDefaultPaymentMethods(ctx context.Context, userID uuid.UUID) error
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	// Returns no row when the balance is insufficient, letting the caller reject
 	// the redemption atomically.
 	DeductUserPoints(ctx context.Context, arg DeductUserPointsParams) (int64, error)
+	GetPaymentByTxRef(ctx context.Context, txRef string) (Payment, error)
 	GetReward(ctx context.Context, id uuid.UUID) (Reward, error)
 	GetSurvey(ctx context.Context, userID uuid.UUID) (Survey, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
+	InsertPayment(ctx context.Context, arg InsertPaymentParams) (Payment, error)
+	InsertPaymentMethod(ctx context.Context, arg InsertPaymentMethodParams) (PaymentMethod, error)
 	InsertPointsTransaction(ctx context.Context, arg InsertPointsTransactionParams) (PointsTransaction, error)
 	InsertRedemption(ctx context.Context, arg InsertRedemptionParams) (Redemption, error)
 	ListBookings(ctx context.Context, arg ListBookingsParams) ([]Booking, error)
 	ListMembershipBenefits(ctx context.Context) ([]MembershipBenefit, error)
 	ListOffers(ctx context.Context) ([]Offer, error)
+	ListPaymentMethods(ctx context.Context, userID uuid.UUID) ([]PaymentMethod, error)
+	ListPayments(ctx context.Context, userID uuid.UUID) ([]Payment, error)
 	ListPointsHistory(ctx context.Context, userID uuid.UUID) ([]PointsTransaction, error)
 	ListRewards(ctx context.Context, category pgtype.Text) ([]Reward, error)
+	UpdatePaymentStatus(ctx context.Context, arg UpdatePaymentStatusParams) (Payment, error)
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
 	UpdateUserTier(ctx context.Context, arg UpdateUserTierParams) (User, error)
 	UpsertSurvey(ctx context.Context, arg UpsertSurveyParams) (Survey, error)

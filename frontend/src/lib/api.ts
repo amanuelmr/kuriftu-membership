@@ -462,4 +462,51 @@ export async function getPaymentHistory(): Promise<Payment[]> {
   }
 }
 
+// Payments via Chapa: initialize opens a hosted checkout; the caller redirects
+// the browser to checkoutUrl. After Chapa returns the user, verify confirms it.
+export async function initializePayment(input: {
+  amount: string;
+  currency?: string;
+  description?: string;
+}): Promise<{ checkoutUrl: string; txRef: string }> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/payments/initialize`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${getToken()}`
+      },
+      body: JSON.stringify(input)
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to start payment");
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Initialize payment error:", error);
+    throw error;
+  }
+}
+
+export async function verifyPayment(txRef: string): Promise<Payment> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/payments/verify/${txRef}`, {
+      headers: {
+        Authorization: `Bearer ${getToken()}`
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to verify payment");
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Verify payment error:", error);
+    throw error;
+  }
+}
+
 // getToken is provided by ./auth (single source of truth for the JWT).
