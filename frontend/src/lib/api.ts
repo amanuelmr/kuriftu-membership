@@ -1,6 +1,9 @@
-// This file contains all API calls to the backend
-// Replace the base URL with your actual backend URL
-const API_BASE_URL = "https://kuriftu-membership-backend-3.onrender.com/api";
+// This file contains all API calls to the backend.
+// The base URL is configured via NEXT_PUBLIC_API_URL (see .env.example).
+import { getToken } from "./auth";
+
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api";
 
 
 // Types for API responses
@@ -181,6 +184,38 @@ export async function updateUserProfile(userData: Partial<User>) {
     return await response.json();
   } catch (error) {
     console.error("Update profile error:", error);
+    throw error;
+  }
+}
+
+// Survey
+export interface SurveyData {
+  visitPurpose: string;
+  preferredAccommodation: string[];
+  interests: string[];
+  travelFrequency: string;
+  specialOccasions?: string;
+  additionalNotes?: string;
+}
+
+export async function submitSurvey(survey: SurveyData) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/survey`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${getToken()}`
+      },
+      body: JSON.stringify(survey)
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to submit survey");
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Submit survey error:", error);
     throw error;
   }
 }
@@ -427,10 +462,51 @@ export async function getPaymentHistory(): Promise<Payment[]> {
   }
 }
 
-// Helper functions
-function getToken() {
-  if (typeof window !== "undefined") {
-    return localStorage.getItem("token") || "";
+// Payments via Chapa: initialize opens a hosted checkout; the caller redirects
+// the browser to checkoutUrl. After Chapa returns the user, verify confirms it.
+export async function initializePayment(input: {
+  amount: string;
+  currency?: string;
+  description?: string;
+}): Promise<{ checkoutUrl: string; txRef: string }> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/payments/initialize`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${getToken()}`
+      },
+      body: JSON.stringify(input)
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to start payment");
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Initialize payment error:", error);
+    throw error;
   }
-  return "";
 }
+
+export async function verifyPayment(txRef: string): Promise<Payment> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/payments/verify/${txRef}`, {
+      headers: {
+        Authorization: `Bearer ${getToken()}`
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to verify payment");
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Verify payment error:", error);
+    throw error;
+  }
+}
+
+// getToken is provided by ./auth (single source of truth for the JWT).

@@ -1,3 +1,5 @@
+'use client'
+
 import { Award, Gift, Hotel, Ticket, TrendingUp, Utensils } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -11,10 +13,38 @@ import { ReservationCard } from "@/components/reservation-card"
 import { ActivityItem } from "@/components/activity-item"
 import { OfferCard } from "@/components/offer-card"
 import { PointsChart } from "@/components/points-chart"
+import { useUser, usePointsBalance, useBookings, usePointsHistory, useOffers } from "@/lib/hooks"
+
+function shortDate(iso: string): string {
+  const d = new Date(iso)
+  return isNaN(d.getTime()) ? iso : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+}
+
+function capitalize(s: string): string {
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s
+}
 
 export default function DashboardPage() {
-  // This is the existing dashboard page we created earlier
-  // I'm adding these imports to fix the missing imports in the points page
+  const { user } = useUser()
+  const { pointsBalance } = usePointsBalance()
+  const { bookings } = useBookings()
+  const { pointsHistory } = usePointsHistory()
+  const { offers } = useOffers()
+
+  const firstName = user?.firstName ?? "there"
+  const points = pointsBalance?.available ?? 0
+  const lifetime = pointsBalance?.lifetime ?? 0
+  const tier = user?.membershipTier ?? "Basic"
+
+  // Renewal countdown derived from the real expiry date.
+  const expiry = user?.expiryDate ? new Date(user.expiryDate) : null
+  const daysToRenewal = expiry ? Math.max(0, Math.ceil((expiry.getTime() - Date.now()) / 86_400_000)) : null
+  const renewalPct = daysToRenewal !== null ? Math.min(100, Math.round((daysToRenewal / 365) * 100)) : 0
+
+  const upcoming = (bookings ?? []).filter((b) => b.status === "confirmed" || b.status === "pending").slice(0, 2)
+  const recentActivity = (pointsHistory ?? []).slice(0, 5)
+  const topOffers = (offers ?? []).slice(0, 2)
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-neutral-50 to-neutral-100 dark:from-neutral-900 dark:to-neutral-800">
       <DashboardHeader />
@@ -22,7 +52,7 @@ export default function DashboardPage() {
         <DashboardNav />
         <main className="flex flex-col gap-8">
           <div className="flex flex-col gap-2">
-            <h1 className="font-serif text-3xl font-bold tracking-tight">Welcome back, Sarah</h1>
+            <h1 className="font-serif text-3xl font-bold tracking-tight">Welcome back, {firstName}</h1>
             <p className="text-muted-foreground">
               Manage your membership, track your points, and explore exclusive benefits.
             </p>
@@ -35,10 +65,10 @@ export default function DashboardPage() {
                 <CardDescription>Your current points balance</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-4xl font-bold text-amber-700 dark:text-amber-300">12,450</div>
+                <div className="text-4xl font-bold text-amber-700 dark:text-amber-300">{points.toLocaleString()}</div>
                 <div className="mt-1 text-sm text-muted-foreground">
                   <TrendingUp className="inline h-4 w-4 mr-1 text-emerald-600" />
-                  <span className="text-emerald-600 font-medium">+450</span> points this month
+                  <span className="text-emerald-600 font-medium">{lifetime.toLocaleString()}</span> lifetime points
                 </div>
               </CardContent>
             </Card>
@@ -46,46 +76,26 @@ export default function DashboardPage() {
             <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 dark:from-purple-950 dark:to-purple-900 dark:border-purple-800">
               <CardHeader className="pb-2">
                 <CardTitle className="text-purple-900 dark:text-purple-100">Membership Tier</CardTitle>
-                <CardDescription>Diamond Member</CardDescription>
+                <CardDescription>{tier} Member</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center gap-2">
                   <Award className="h-6 w-6 text-purple-700 dark:text-purple-300" />
-                  <div className="text-xl font-bold text-purple-700 dark:text-purple-300">Diamond</div>
+                  <div className="text-xl font-bold text-purple-700 dark:text-purple-300">{tier}</div>
                 </div>
-                <div className="mt-2">
-                  <div className="flex justify-between text-sm mb-1">
-                    <span>Renewal in 45 days</span>
-                    <span className="font-medium">85%</span>
+                {daysToRenewal !== null && (
+                  <div className="mt-2">
+                    <div className="flex justify-between text-sm mb-1">
+                      <span>Renewal in {daysToRenewal} days</span>
+                      <span className="font-medium">{renewalPct}%</span>
+                    </div>
+                    <Progress value={renewalPct} className="h-2 bg-purple-200 dark:bg-purple-800">
+                      <div className="h-full bg-gradient-to-r from-purple-500 to-purple-700 dark:from-purple-400 dark:to-purple-600 rounded-full" />
+                    </Progress>
                   </div>
-                  <Progress value={85} className="h-2 bg-purple-200 dark:bg-purple-800">
-                    <div className="h-full bg-gradient-to-r from-purple-500 to-purple-700 dark:from-purple-400 dark:to-purple-600 rounded-full" />
-                  </Progress>
-                </div>
+                )}
               </CardContent>
             </Card>
-
-            {/* <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200 dark:from-emerald-950 dark:to-emerald-900 dark:border-emerald-800">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-emerald-900 dark:text-emerald-100">Next Reward</CardTitle>
-                <CardDescription>Points needed for next reward</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-2">
-                  <Gift className="h-6 w-6 text-emerald-700 dark:text-emerald-300" />
-                  <div className="text-xl font-bold text-emerald-700 dark:text-emerald-300">Free Night Stay</div>
-                </div>
-                <div className="mt-2">
-                  <div className="flex justify-between text-sm mb-1">
-                    <span>2,550 more points needed</span>
-                    <span className="font-medium">75%</span>
-                  </div>
-                  <Progress value={75} className="h-2 bg-emerald-200 dark:bg-emerald-800">
-                    <div className="h-full bg-gradient-to-r from-emerald-500 to-emerald-700 dark:from-emerald-400 dark:to-emerald-600 rounded-full" />
-                  </Progress>
-                </div>
-              </CardContent>
-            </Card> */}
           </div>
 
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -96,11 +106,15 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <MembershipCard
-                  name="Sarah Johnson"
-                  memberId="DM-78912345"
-                  tier="Diamond"
-                  since="2021"
-                  expiryDate="12/2025"
+                  name={user ? `${user.firstName} ${user.lastName}`.trim() : "Member"}
+                  memberId={user?.membershipId ?? "—"}
+                  tier={tier}
+                  since={user?.memberSince ? new Date(user.memberSince).getFullYear().toString() : "—"}
+                  expiryDate={
+                    user?.expiryDate
+                      ? new Date(user.expiryDate).toLocaleDateString("en-US", { month: "2-digit", year: "numeric" })
+                      : "—"
+                  }
                 />
               </CardContent>
             </Card>
@@ -150,24 +164,23 @@ export default function DashboardPage() {
               <TabsTrigger value="offers">Exclusive Offers</TabsTrigger>
             </TabsList>
             <TabsContent value="upcoming" className="mt-6">
-              <div className="grid gap-6 md:grid-cols-2">
-                <ReservationCard
-                  image="https://images.unsplash.com/photo-1571896349842-33c89424de2d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80"
-                  title="Lakeside Villa"
-                  dates="May 15 - May 18, 2025"
-                  status="Confirmed"
-                  guests={2}
-                  amenities={["Lake View", "Private Pool", "Breakfast Included"]}
-                />
-                <ReservationCard
-                  image="https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80"
-                  title="Mountain View Suite"
-                  dates="July 10 - July 15, 2025"
-                  status="Pending"
-                  guests={4}
-                  amenities={["Mountain View", "Spa Access", "All-Inclusive"]}
-                />
-              </div>
+              {upcoming.length === 0 ? (
+                <p className="text-muted-foreground py-8 text-center">No upcoming stays.</p>
+              ) : (
+                <div className="grid gap-6 md:grid-cols-2">
+                  {upcoming.map((b) => (
+                    <ReservationCard
+                      key={b.id}
+                      image={b.image}
+                      title={b.title}
+                      dates={`${shortDate(b.checkIn)} - ${shortDate(b.checkOut)}`}
+                      status={capitalize(b.status) as "Confirmed" | "Pending" | "Cancelled"}
+                      guests={b.guests}
+                      amenities={b.amenities}
+                    />
+                  ))}
+                </div>
+              )}
             </TabsContent>
             <TabsContent value="activity" className="mt-6">
               <Card>
@@ -176,11 +189,19 @@ export default function DashboardPage() {
                   <CardDescription>Your recent points transactions</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <ActivityItem title="Stay at Kuriftu Bishoftu" date="April 2, 2025" points="+1,250" type="earned" />
-                  <ActivityItem title="Spa Treatment" date="April 3, 2025" points="+350" type="earned" />
-                  <ActivityItem title="Restaurant Dining" date="April 3, 2025" points="+180" type="earned" />
-                  <ActivityItem title="Free Night Redemption" date="March 15, 2025" points="-2,500" type="redeemed" />
-                  <ActivityItem title="Tier Bonus" date="March 1, 2025" points="+500" type="earned" />
+                  {recentActivity.length === 0 ? (
+                    <p className="text-muted-foreground py-4 text-center">No points activity yet.</p>
+                  ) : (
+                    recentActivity.map((t) => (
+                      <ActivityItem
+                        key={t.id}
+                        title={t.description}
+                        date={shortDate(t.date)}
+                        points={`${t.type === "earned" ? "+" : "-"}${Number(t.points).toLocaleString()}`}
+                        type={t.type}
+                      />
+                    ))
+                  )}
                 </CardContent>
                 <CardFooter>
                   <Button variant="outline" className="w-full">
@@ -190,22 +211,22 @@ export default function DashboardPage() {
               </Card>
             </TabsContent>
             <TabsContent value="offers" className="mt-6">
-              <div className="grid gap-6 md:grid-cols-2">
-                <OfferCard
-                  image="https://images.unsplash.com/photo-1544161515-4ab6ce6db874?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80"
-                  title="Exclusive Spa Package"
-                  description="Enjoy a complimentary 90-minute spa treatment when you book a 3-night stay."
-                  expiry="Valid until June 30, 2025"
-                  discount="30% OFF"
-                />
-                <OfferCard
-                  image="https://images.unsplash.com/photo-1414235077428-338989a2e8c0?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80"
-                  title="Fine Dining Experience"
-                  description="Special tasting menu with wine pairing at our signature restaurant."
-                  expiry="Valid until May 15, 2025"
-                  discount="20% OFF"
-                />
-              </div>
+              {topOffers.length === 0 ? (
+                <p className="text-muted-foreground py-8 text-center">No offers available right now.</p>
+              ) : (
+                <div className="grid gap-6 md:grid-cols-2">
+                  {topOffers.map((o) => (
+                    <OfferCard
+                      key={o.id}
+                      image={o.image}
+                      title={o.title}
+                      description={o.description}
+                      expiry={`Valid until ${shortDate(o.expiry)}`}
+                      discount={o.discount}
+                    />
+                  ))}
+                </div>
+              )}
             </TabsContent>
           </Tabs>
 

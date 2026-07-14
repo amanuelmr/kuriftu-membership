@@ -1,8 +1,7 @@
 'use client'
 import { Award, ShoppingBag, Hotel, Utensils, SpadeIcon as Spa, Users } from "lucide-react"
-import { useEffect, useState } from "react"
-import Cookies from "js-cookie"
 
+import { usePointsBalance, useUser } from "@/lib/hooks"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -14,20 +13,12 @@ import { MembershipUpgradeCard } from "@/components/membership-upgrade-card"
 import { ProductCard } from "@/components/product-card"
 
 export default function PointsPage() {
-  const [points, setPoints] = useState(0)
+  const { pointsBalance } = usePointsBalance()
+  const { user } = useUser()
 
-  useEffect(() => {
-    const fetchPoints = async () => {
-      const userId = Cookies.get('user_id')
-      const response = await fetch(`https://kuriftu-membership-backend-3.onrender.com/api/loyalty/redeem-points?userId=${userId}`)
-      const data = await response.json()
-      setPoints(data.points)
-    }
-    
-    fetchPoints()
-  }, [])
-
-  console.log(points)
+  const points = pointsBalance?.available ?? 0
+  const lifetime = pointsBalance?.lifetime ?? 0
+  const tier = user?.membershipTier ?? "Basic"
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-neutral-50 to-neutral-100 dark:from-neutral-900 dark:to-neutral-800">
@@ -48,7 +39,7 @@ export default function PointsPage() {
                 <CardTitle className="text-amber-900 dark:text-amber-100">Available Points</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-4xl font-bold text-amber-700 dark:text-amber-300">{points}</div>
+                <div className="text-4xl font-bold text-amber-700 dark:text-amber-300">{points.toLocaleString()}</div>
               </CardContent>
             </Card>
 
@@ -57,7 +48,7 @@ export default function PointsPage() {
                 <CardTitle className="text-emerald-900 dark:text-emerald-100">Lifetime Points</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-4xl font-bold text-emerald-700 dark:text-emerald-300">24,850</div>
+                <div className="text-4xl font-bold text-emerald-700 dark:text-emerald-300">{lifetime.toLocaleString()}</div>
               </CardContent>
             </Card>
 
@@ -68,7 +59,7 @@ export default function PointsPage() {
               <CardContent>
                 <div className="flex items-center gap-2">
                   <Award className="h-6 w-6 text-purple-700 dark:text-purple-300" />
-                  <div className="text-xl font-bold text-purple-700 dark:text-purple-300">Diamond</div>
+                  <div className="text-xl font-bold text-purple-700 dark:text-purple-300">{tier}</div>
                 </div>
               </CardContent>
             </Card>
