@@ -12,12 +12,16 @@ import (
 )
 
 type Config struct {
-	Port        string
-	DatabaseURL string
-	JWTSecret   string
-	JWTExpiry   time.Duration
-	CORSOrigins []string
-	Env         string // "development" | "production"
+	Port           string
+	DatabaseURL    string
+	JWTSecret      string
+	JWTExpiry      time.Duration
+	CORSOrigins    []string
+	Env            string // "development" | "production"
+	ChapaSecretKey string // CHASECK_TEST-... ; empty => Chapa runs in mock mode
+	ChapaBaseURL   string
+	AppBaseURL     string // public base URL of this API, for Chapa callbacks
+	FrontendURL    string // where Chapa returns the user after checkout
 }
 
 // Load reads configuration from the environment. It attempts to load a .env
@@ -33,6 +37,11 @@ func Load() (*Config, error) {
 		JWTExpiry:   getEnvDuration("JWT_EXPIRY", 7*24*time.Hour),
 		CORSOrigins: getEnvList("CORS_ORIGINS", []string{"http://localhost:3000"}),
 		Env:         getEnv("APP_ENV", "development"),
+
+		ChapaSecretKey: os.Getenv("CHAPA_SECRET_KEY"),
+		ChapaBaseURL:   getEnv("CHAPA_BASE_URL", "https://api.chapa.co/v1"),
+		AppBaseURL:     getEnv("APP_BASE_URL", "http://localhost:8080"),
+		FrontendURL:    getEnv("FRONTEND_URL", "http://localhost:3000"),
 	}
 
 	if cfg.DatabaseURL == "" {

@@ -90,6 +90,31 @@ type Offer struct {
 	CreatedAt   time.Time `json:"created_at"`
 }
 
+type Payment struct {
+	ID            uuid.UUID `json:"id"`
+	UserID        uuid.UUID `json:"user_id"`
+	TxRef         string    `json:"tx_ref"`
+	Description   string    `json:"description"`
+	Amount        string    `json:"amount"`
+	Currency      string    `json:"currency"`
+	Status        string    `json:"status"`
+	PaymentMethod string    `json:"payment_method"`
+	CheckoutUrl   string    `json:"checkout_url"`
+	OccurredAt    time.Time `json:"occurred_at"`
+}
+
+type PaymentMethod struct {
+	ID        uuid.UUID `json:"id"`
+	UserID    uuid.UUID `json:"user_id"`
+	Brand     string    `json:"brand"`
+	LastFour  string    `json:"last_four"`
+	ExpMonth  string    `json:"exp_month"`
+	ExpYear   string    `json:"exp_year"`
+	Name      string    `json:"name"`
+	IsDefault bool      `json:"is_default"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 type PointsTransaction struct {
 	ID           int64     `json:"id"`
 	UserID       uuid.UUID `json:"user_id"`

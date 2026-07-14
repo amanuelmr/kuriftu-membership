@@ -77,6 +77,17 @@ Base path `/api`.
 | GET    | `/bookings[?status=]`  | Bearer | user's bookings |
 | GET    | `/offers`              | Bearer | active offers |
 | POST   | `/survey`              | Bearer | upsert onboarding survey |
+| GET    | `/payment-methods`     | Bearer | saved methods (brand + last4 only) |
+| POST   | `/payment-methods`     | Bearer | add method; PAN/CVV never stored |
+| GET    | `/payments/history`    | Bearer | payment history |
+| POST   | `/payments/initialize` | Bearer | open a Chapa checkout → `{checkoutUrl, txRef}` |
+| GET    | `/payments/verify/{txRef}` | Bearer | confirm a payment with Chapa |
 
-Remaining endpoints (payment methods + history) are planned — see the project
-plan.
+## Payments (Chapa)
+
+Payments go through the [Chapa](https://developer.chapa.co) gateway. With no
+`CHAPA_SECRET_KEY` set the client runs in **mock mode** — checkout is simulated
+locally and verification always succeeds — so the flow is fully testable without
+a real account. Set a `CHASECK_TEST-...` key to use Chapa's test API. Card
+details submitted to `POST /payment-methods` are reduced to brand + last4
+server-side; the PAN and CVV are never persisted.

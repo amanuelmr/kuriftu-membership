@@ -14,7 +14,7 @@ import (
 
 // Router wires all routes. New resource handlers are registered here as the
 // backend grows through the planned phases.
-func Router(authMgr *auth.Manager, corsOrigins []string, users *UserHandler, loyalty *LoyaltyHandler, catalog *CatalogHandler) http.Handler {
+func Router(authMgr *auth.Manager, corsOrigins []string, users *UserHandler, loyalty *LoyaltyHandler, catalog *CatalogHandler, payments *PaymentHandler) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(chimw.RequestID)
@@ -58,6 +58,12 @@ func Router(authMgr *auth.Manager, corsOrigins []string, users *UserHandler, loy
 			r.Get("/bookings", catalog.Bookings)
 			r.Get("/offers", catalog.Offers)
 			r.Post("/survey", catalog.SaveSurvey)
+
+			r.Get("/payment-methods", payments.PaymentMethods)
+			r.Post("/payment-methods", payments.AddPaymentMethod)
+			r.Get("/payments/history", payments.PaymentHistory)
+			r.Post("/payments/initialize", payments.InitializePayment)
+			r.Get("/payments/verify/{txRef}", payments.VerifyPayment)
 		})
 	})
 
