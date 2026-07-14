@@ -12,7 +12,7 @@ import (
 )
 
 const getPaymentByTxRef = `-- name: GetPaymentByTxRef :one
-SELECT id, user_id, tx_ref, description, amount, currency, status, payment_method, checkout_url, occurred_at FROM payments WHERE tx_ref = $1
+SELECT id, user_id, tx_ref, description, amount, currency, status, payment_method, checkout_url, occurred_at, purpose, target_tier FROM payments WHERE tx_ref = $1
 `
 
 func (q *Queries) GetPaymentByTxRef(ctx context.Context, txRef string) (Payment, error) {
@@ -29,14 +29,16 @@ func (q *Queries) GetPaymentByTxRef(ctx context.Context, txRef string) (Payment,
 		&i.PaymentMethod,
 		&i.CheckoutUrl,
 		&i.OccurredAt,
+		&i.Purpose,
+		&i.TargetTier,
 	)
 	return i, err
 }
 
 const insertPayment = `-- name: InsertPayment :one
-INSERT INTO payments (user_id, tx_ref, description, amount, currency, status, payment_method, checkout_url)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, user_id, tx_ref, description, amount, currency, status, payment_method, checkout_url, occurred_at
+INSERT INTO payments (user_id, tx_ref, description, amount, currency, status, payment_method, checkout_url, purpose, target_tier)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+RETURNING id, user_id, tx_ref, description, amount, currency, status, payment_method, checkout_url, occurred_at, purpose, target_tier
 `
 
 type InsertPaymentParams struct {
@@ -48,6 +50,8 @@ type InsertPaymentParams struct {
 	Status        string    `json:"status"`
 	PaymentMethod string    `json:"payment_method"`
 	CheckoutUrl   string    `json:"checkout_url"`
+	Purpose       string    `json:"purpose"`
+	TargetTier    string    `json:"target_tier"`
 }
 
 func (q *Queries) InsertPayment(ctx context.Context, arg InsertPaymentParams) (Payment, error) {
@@ -60,6 +64,8 @@ func (q *Queries) InsertPayment(ctx context.Context, arg InsertPaymentParams) (P
 		arg.Status,
 		arg.PaymentMethod,
 		arg.CheckoutUrl,
+		arg.Purpose,
+		arg.TargetTier,
 	)
 	var i Payment
 	err := row.Scan(
@@ -73,12 +79,14 @@ func (q *Queries) InsertPayment(ctx context.Context, arg InsertPaymentParams) (P
 		&i.PaymentMethod,
 		&i.CheckoutUrl,
 		&i.OccurredAt,
+		&i.Purpose,
+		&i.TargetTier,
 	)
 	return i, err
 }
 
 const listPayments = `-- name: ListPayments :many
-SELECT id, user_id, tx_ref, description, amount, currency, status, payment_method, checkout_url, occurred_at FROM payments
+SELECT id, user_id, tx_ref, description, amount, currency, status, payment_method, checkout_url, occurred_at, purpose, target_tier FROM payments
 WHERE user_id = $1
 ORDER BY occurred_at DESC
 `
@@ -103,6 +111,8 @@ func (q *Queries) ListPayments(ctx context.Context, userID uuid.UUID) ([]Payment
 			&i.PaymentMethod,
 			&i.CheckoutUrl,
 			&i.OccurredAt,
+			&i.Purpose,
+			&i.TargetTier,
 		); err != nil {
 			return nil, err
 		}
@@ -118,7 +128,7 @@ const updatePaymentStatus = `-- name: UpdatePaymentStatus :one
 UPDATE payments
 SET status = $2
 WHERE tx_ref = $1
-RETURNING id, user_id, tx_ref, description, amount, currency, status, payment_method, checkout_url, occurred_at
+RETURNING id, user_id, tx_ref, description, amount, currency, status, payment_method, checkout_url, occurred_at, purpose, target_tier
 `
 
 type UpdatePaymentStatusParams struct {
@@ -140,6 +150,8 @@ func (q *Queries) UpdatePaymentStatus(ctx context.Context, arg UpdatePaymentStat
 		&i.PaymentMethod,
 		&i.CheckoutUrl,
 		&i.OccurredAt,
+		&i.Purpose,
+		&i.TargetTier,
 	)
 	return i, err
 }

@@ -94,6 +94,8 @@ export default function PointsPage() {
         amount: String(pointsRequired),
         currency: "ETB",
         description: `${tierName} membership upgrade`,
+        purpose: "membership_upgrade",
+        targetTier: tierName,
       })
       window.location.href = checkoutUrl
     } catch {

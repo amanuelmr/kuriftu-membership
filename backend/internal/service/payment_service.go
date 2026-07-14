@@ -13,7 +13,13 @@ import (
 	"github.com/amanuelmr/kuriftu-membership/backend/internal/repository"
 )
 
-var ErrPaymentNotFound = errors.New("payment not found")
+var (
+	ErrPaymentNotFound  = errors.New("payment not found")
+	ErrPaymentForbidden = errors.New("payment does not belong to this user")
+)
+
+// PurposeMembershipUpgrade marks a payment whose success should grant a tier.
+const PurposeMembershipUpgrade = "membership_upgrade"
 
 // PaymentService manages stored payment methods (brand + last4 only) and
 // payments processed through Chapa.
@@ -70,9 +76,20 @@ type InitializePaymentResult struct {
 	TxRef       string
 }
 
+// InitializeInput describes a payment to open. Purpose/TargetTier let a
+// successful verification complete an action (e.g. grant a membership tier).
+type InitializeInput struct {
+	Amount      string
+	Currency    string
+	Description string
+	Purpose     string
+	TargetTier  string
+}
+
 // InitializePayment opens a Chapa checkout for the given amount and records a
-// pending payment.
-func (s *PaymentService) InitializePayment(ctx context.Context, userID uuid.UUID, amount, currency, description string) (InitializePaymentResult, error) {
+// pending payment. The return URL carries the tx_ref so the return page can
+// verify it.
+func (s *PaymentService) InitializePayment(ctx context.Context, userID uuid.UUID, in InitializeInput) (InitializePaymentResult, error) {
 	user, err := s.q.GetUserByID(ctx, userID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -80,20 +97,25 @@ func (s *PaymentService) InitializePayment(ctx context.Context, userID uuid.UUID
 		}
 		return InitializePaymentResult{}, fmt.Errorf("get user: %w", err)
 	}
+	currency := in.Currency
 	if currency == "" {
 		currency = "ETB"
+	}
+	purpose := in.Purpose
+	if purpose == "" {
+		purpose = "general"
 	}
 	txRef := "krf-" + uuid.NewString()
 
 	checkoutURL, err := s.chapa.Initialize(ctx, chapa.InitializeRequest{
-		Amount:      amount,
+		Amount:      in.Amount,
 		Currency:    currency,
 		Email:       user.Email,
 		FirstName:   user.FirstName,
 		LastName:    user.LastName,
 		TxRef:       txRef,
 		CallbackURL: s.callbackURL,
-		ReturnURL:   s.returnURL,
+		ReturnURL:   fmt.Sprintf("%s?tx_ref=%s", s.returnURL, txRef),
 	})
 	if err != nil {
 		return InitializePaymentResult{}, err
@@ -102,12 +124,14 @@ func (s *PaymentService) InitializePayment(ctx context.Context, userID uuid.UUID
 	if _, err := s.q.InsertPayment(ctx, repository.InsertPaymentParams{
 		UserID:        userID,
 		TxRef:         txRef,
-		Description:   description,
-		Amount:        amount,
+		Description:   in.Description,
+		Amount:        in.Amount,
 		Currency:      currency,
 		Status:        "upcoming",
 		PaymentMethod: "Chapa",
 		CheckoutUrl:   checkoutURL,
+		Purpose:       purpose,
+		TargetTier:    in.TargetTier,
 	}); err != nil {
 		return InitializePaymentResult{}, fmt.Errorf("insert payment: %w", err)
 	}
@@ -115,13 +139,19 @@ func (s *PaymentService) InitializePayment(ctx context.Context, userID uuid.UUID
 	return InitializePaymentResult{CheckoutURL: checkoutURL, TxRef: txRef}, nil
 }
 
-// VerifyPayment confirms a payment with Chapa and updates its status.
-func (s *PaymentService) VerifyPayment(ctx context.Context, txRef string) (repository.Payment, error) {
-	if _, err := s.q.GetPaymentByTxRef(ctx, txRef); err != nil {
+// VerifyPayment confirms a payment with Chapa, updates its status, and (on
+// success) completes the payment's purpose — e.g. granting a purchased tier.
+// It only allows the owning user to verify their own payment.
+func (s *PaymentService) VerifyPayment(ctx context.Context, userID uuid.UUID, txRef string) (repository.Payment, error) {
+	payment, err := s.q.GetPaymentByTxRef(ctx, txRef)
+	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return repository.Payment{}, ErrPaymentNotFound
 		}
 		return repository.Payment{}, fmt.Errorf("get payment: %w", err)
+	}
+	if payment.UserID != userID {
+		return repository.Payment{}, ErrPaymentForbidden
 	}
 
 	ok, err := s.chapa.Verify(ctx, txRef)
@@ -132,5 +162,24 @@ func (s *PaymentService) VerifyPayment(ctx context.Context, txRef string) (repos
 	if ok {
 		status = "completed"
 	}
-	return s.q.UpdatePaymentStatus(ctx, repository.UpdatePaymentStatusParams{TxRef: txRef, Status: status})
+
+	updated, err := s.q.UpdatePaymentStatus(ctx, repository.UpdatePaymentStatusParams{TxRef: txRef, Status: status})
+	if err != nil {
+		return repository.Payment{}, fmt.Errorf("update status: %w", err)
+	}
+
+	// Grant the purchased tier on success. Idempotent: re-verifying just re-sets
+	// the same tier. validTiers is defined in loyalty_service.go.
+	if ok && updated.Purpose == PurposeMembershipUpgrade {
+		if _, valid := validTiers[updated.TargetTier]; valid {
+			if _, err := s.q.UpdateUserTier(ctx, repository.UpdateUserTierParams{
+				ID:             userID,
+				MembershipTier: validTiers[updated.TargetTier],
+			}); err != nil {
+				return repository.Payment{}, fmt.Errorf("grant tier: %w", err)
+			}
+		}
+	}
+
+	return updated, nil
 }

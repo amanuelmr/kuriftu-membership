@@ -104,6 +104,8 @@ export function MembershipUpgradeOptions() {
         amount,
         currency: "ETB",
         description: `${tierName} membership upgrade`,
+        purpose: "membership_upgrade",
+        targetTier: tierName,
       })
       // Hand off to the Chapa hosted checkout (mock returns a local URL).
       window.location.href = checkoutUrl

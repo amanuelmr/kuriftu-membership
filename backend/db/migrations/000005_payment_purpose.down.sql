@@ -1,0 +1,2 @@
+ALTER TABLE payments DROP COLUMN IF EXISTS target_tier;
+ALTER TABLE payments DROP COLUMN IF EXISTS purpose;

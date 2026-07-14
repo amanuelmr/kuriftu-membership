@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -97,6 +98,8 @@ type initPaymentRequest struct {
 	Amount      string `json:"amount" validate:"required"`
 	Currency    string `json:"currency"`
 	Description string `json:"description"`
+	Purpose     string `json:"purpose"`
+	TargetTier  string `json:"targetTier"`
 }
 
 // InitializePayment handles POST /api/payments/initialize and returns a Chapa
@@ -112,7 +115,13 @@ func (h *PaymentHandler) InitializePayment(w http.ResponseWriter, r *http.Reques
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	res, err := h.payments.InitializePayment(r.Context(), userID, req.Amount, req.Currency, req.Description)
+	res, err := h.payments.InitializePayment(r.Context(), userID, service.InitializeInput{
+		Amount:      req.Amount,
+		Currency:    req.Currency,
+		Description: req.Description,
+		Purpose:     req.Purpose,
+		TargetTier:  req.TargetTier,
+	})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "could not start payment")
 		return
@@ -122,18 +131,22 @@ func (h *PaymentHandler) InitializePayment(w http.ResponseWriter, r *http.Reques
 
 // VerifyPayment handles GET /api/payments/verify/{txRef}.
 func (h *PaymentHandler) VerifyPayment(w http.ResponseWriter, r *http.Request) {
-	if _, ok := middleware.UserIDFromContext(r.Context()); !ok {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
 		writeError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
 	txRef := chi.URLParam(r, "txRef")
-	payment, err := h.payments.VerifyPayment(r.Context(), txRef)
+	payment, err := h.payments.VerifyPayment(r.Context(), userID, txRef)
 	if err != nil {
-		if err == service.ErrPaymentNotFound {
+		switch {
+		case errors.Is(err, service.ErrPaymentNotFound):
 			writeError(w, http.StatusNotFound, "payment not found")
-			return
+		case errors.Is(err, service.ErrPaymentForbidden):
+			writeError(w, http.StatusForbidden, "forbidden")
+		default:
+			writeError(w, http.StatusInternalServerError, "could not verify payment")
 		}
-		writeError(w, http.StatusInternalServerError, "could not verify payment")
 		return
 	}
 	writeJSON(w, http.StatusOK, model.NewPaymentDTO(payment))

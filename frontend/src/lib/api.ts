@@ -468,6 +468,8 @@ export async function initializePayment(input: {
   amount: string;
   currency?: string;
   description?: string;
+  purpose?: string;
+  targetTier?: string;
 }): Promise<{ checkoutUrl: string; txRef: string }> {
   try {
     const response = await fetch(`${API_BASE_URL}/payments/initialize`, {

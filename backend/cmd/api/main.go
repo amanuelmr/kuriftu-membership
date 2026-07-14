@@ -67,7 +67,7 @@ func run() error {
 		queries,
 		chapaClient,
 		cfg.AppBaseURL+"/api/payments/webhook",
-		cfg.FrontendURL+"/dashboard/payments",
+		cfg.FrontendURL+"/dashboard/payment/return",
 	)
 
 	userHandler := handler.NewUserHandler(userSvc)

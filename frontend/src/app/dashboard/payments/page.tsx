@@ -1,15 +1,35 @@
-import { Plus } from "lucide-react"
+'use client'
 
-import { Button } from "@/components/ui/button"
+import { Award } from "lucide-react"
+
+import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DashboardHeader } from "@/components/dashboard-header"
 import { DashboardNav } from "@/components/dashboard-nav"
-import { PaymentMethodCard } from "@/components/payment-method-card"
-import { PaymentHistory } from "@/components/payment-history"
-import { AddPaymentMethodForm } from "@/components/add-payment-method-form"
+import { usePaymentHistory } from "@/lib/hooks"
+
+// Payments are processed through Chapa's hosted checkout, so cards are entered
+// on Chapa's page and never stored here — this screen is read-only history.
+
+const STATUS_STYLES: Record<string, string> = {
+  completed: "bg-emerald-100 text-emerald-800 border-emerald-200",
+  upcoming: "bg-amber-100 text-amber-800 border-amber-200",
+  redeemed: "bg-blue-100 text-blue-800 border-blue-200",
+  failed: "bg-red-100 text-red-800 border-red-200",
+}
+
+function formatDate(iso: string): string {
+  const d = new Date(iso)
+  return isNaN(d.getTime())
+    ? iso
+    : d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
+}
 
 export default function PaymentsPage() {
+  const { paymentHistory, isLoading } = usePaymentHistory()
+  const payments = paymentHistory ?? []
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-neutral-50 to-neutral-100 dark:from-neutral-900 dark:to-neutral-800">
       <DashboardHeader />
@@ -17,73 +37,75 @@ export default function PaymentsPage() {
         <DashboardNav />
         <main className="flex flex-col gap-8">
           <div className="flex flex-col gap-2">
-            <h1 className="font-serif text-3xl font-bold tracking-tight">Payment Methods</h1>
-            <p className="text-muted-foreground">Manage your payment methods and view your payment history.</p>
+            <h1 className="font-serif text-3xl font-bold tracking-tight">Payments</h1>
+            <p className="text-muted-foreground">
+              Your payment history. Payments are processed securely through Chapa at checkout.
+            </p>
           </div>
 
-          <Tabs defaultValue="methods" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="methods">Payment Methods</TabsTrigger>
-              <TabsTrigger value="history">Payment History</TabsTrigger>
-            </TabsList>
-            <TabsContent value="methods" className="mt-6 space-y-6">
-              <div className="flex justify-between items-center">
-                <h2 className="text-xl font-bold">Your Payment Methods</h2>
-                <Button>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Payment Method
-                </Button>
+          <Card>
+            <CardHeader>
+              <CardTitle>Payment History</CardTitle>
+              <CardDescription>A record of your transactions with Kuriftu Resort</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Method</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {isLoading && (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                          Loading payments…
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    {!isLoading && payments.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                          No payments yet.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    {payments.map((p) => (
+                      <TableRow key={p.id}>
+                        <TableCell className="font-medium">{formatDate(p.date)}</TableCell>
+                        <TableCell>{p.description || "Payment"}</TableCell>
+                        <TableCell>{p.paymentMethod}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={STATUS_STYLES[p.status] ?? ""}>
+                            {p.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-medium">{p.amount} ETB</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
+            </CardContent>
+          </Card>
 
-              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                <PaymentMethodCard
-                  type="visa"
-                  lastFour="4242"
-                  expiryMonth="12"
-                  expiryYear="2026"
-                  name="Sarah Johnson"
-                  isDefault={true}
-                />
-                <PaymentMethodCard
-                  type="mastercard"
-                  lastFour="5555"
-                  expiryMonth="09"
-                  expiryYear="2025"
-                  name="Sarah Johnson"
-                  isDefault={false}
-                />
-                <PaymentMethodCard
-                  type="amex"
-                  lastFour="9876"
-                  expiryMonth="04"
-                  expiryYear="2027"
-                  name="Sarah Johnson"
-                  isDefault={false}
-                />
+          <Card className="bg-muted/40">
+            <CardContent className="flex items-start gap-3 p-6">
+              <Award className="h-6 w-6 text-primary mt-0.5" />
+              <div>
+                <h3 className="font-medium">How payments work</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  When you upgrade your membership or make a purchase, you&apos;re taken to Chapa&apos;s secure
+                  checkout to pay. We never store your card details — only a record of the transaction appears here.
+                </p>
               </div>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Add New Payment Method</CardTitle>
-                  <CardDescription>Add a new credit or debit card</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <AddPaymentMethodForm />
-                </CardContent>
-              </Card>
-            </TabsContent>
-            <TabsContent value="history" className="mt-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Payment History</CardTitle>
-                  <CardDescription>Your recent payments and transactions</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <PaymentHistory />
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
+            </CardContent>
+          </Card>
         </main>
       </div>
     </div>
