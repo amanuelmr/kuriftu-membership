@@ -1,9 +1,15 @@
+'use client'
+
 import { Check } from "lucide-react"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useUser } from "@/lib/hooks"
 
 export function MembershipBenefits() {
+  const { user } = useUser()
+  const currentTier = user?.membershipTier ?? "Basic"
+
   const tiers = [
     {
       name: "Basic",
@@ -60,19 +66,21 @@ export function MembershipBenefits() {
         "Annual 5,000 bonus points",
         "Ability to gift Gold status to a friend",
       ],
-      current: true,
     },
   ]
 
   return (
-    <Tabs defaultValue="Diamond">
+    <Tabs defaultValue={currentTier}>
       <TabsList className="grid w-full grid-cols-4">
-        {tiers.map((tier) => (
-          <TabsTrigger key={tier.name} value={tier.name} className={tier.current ? "bg-primary/10" : ""}>
-            {tier.name}
-            {tier.current && <span className="ml-2 text-xs">(Current)</span>}
-          </TabsTrigger>
-        ))}
+        {tiers.map((tier) => {
+          const isCurrent = tier.name === currentTier
+          return (
+            <TabsTrigger key={tier.name} value={tier.name} className={isCurrent ? "bg-primary/10" : ""}>
+              {tier.name}
+              {isCurrent && <span className="ml-2 text-xs">(Current)</span>}
+            </TabsTrigger>
+          )
+        })}
       </TabsList>
       {tiers.map((tier) => (
         <TabsContent key={tier.name} value={tier.name} className="mt-6">
@@ -80,7 +88,7 @@ export function MembershipBenefits() {
             <CardHeader>
               <CardTitle>{tier.name} Membership Benefits</CardTitle>
               <CardDescription>
-                {tier.current
+                {tier.name === currentTier
                   ? "Your current membership benefits"
                   : `Benefits you ${tier.name === "Basic" ? "currently have" : "would receive"} with ${tier.name} membership`}
               </CardDescription>

@@ -1,4 +1,4 @@
-import { Award, Check } from "lucide-react"
+import { Award, Check, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 import { Button } from "@/components/ui/button"
@@ -13,6 +13,9 @@ interface MembershipUpgradeCardProps {
   color: "amber" | "slate" | "purple"
   canAfford: boolean
   current?: boolean
+  onUpgrade?: () => void
+  onPurchase?: () => void
+  isProcessing?: boolean
 }
 
 export function MembershipUpgradeCard({
@@ -23,6 +26,9 @@ export function MembershipUpgradeCard({
   color,
   canAfford,
   current = false,
+  onUpgrade,
+  onPurchase,
+  isProcessing = false,
 }: MembershipUpgradeCardProps) {
   const colorClasses = {
     amber: {
@@ -106,10 +112,18 @@ export function MembershipUpgradeCard({
             Current Tier
           </Button>
         ) : canAfford ? (
-          <Button className={cn("w-full", colorClasses[color].button)}>Upgrade Now</Button>
+          <Button
+            className={cn("w-full", colorClasses[color].button)}
+            disabled={isProcessing}
+            onClick={onUpgrade}
+          >
+            {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Upgrade Now
+          </Button>
         ) : (
-          <Button className="w-full" variant="outline" disabled>
-            Not Enough Points
+          <Button className="w-full" variant="outline" disabled={isProcessing} onClick={onPurchase}>
+            {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Purchase Upgrade
           </Button>
         )}
       </CardFooter>

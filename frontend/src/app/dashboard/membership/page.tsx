@@ -1,3 +1,5 @@
+'use client'
+
 import { Award, Calendar, CreditCard, Gift, Info } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -10,8 +12,33 @@ import { MembershipCard } from "@/components/membership-card"
 import { MembershipBenefits } from "@/components/membership-benefits"
 import { MembershipHistory } from "@/components/membership-history"
 import { MembershipUpgradeOptions } from "@/components/membership-upgrade-options"
+import { useUser } from "@/lib/hooks"
+
+// Annual fee by tier (used for the "Next Payment" estimate).
+const TIER_FEE: Record<string, string> = {
+  Basic: "$0.00",
+  Golden: "$100.00",
+  Platinum: "$350.00",
+  Diamond: "$750.00",
+}
 
 export default function MembershipPage() {
+  const { user } = useUser()
+
+  const tier = user?.membershipTier ?? "Basic"
+  const fullName = user ? `${user.firstName} ${user.lastName}`.trim() : "Member"
+
+  const memberSince = user?.memberSince ? new Date(user.memberSince) : null
+  const expiry = user?.expiryDate ? new Date(user.expiryDate) : null
+  const now = new Date()
+
+  const sinceLabel = memberSince
+    ? memberSince.toLocaleDateString("en-US", { month: "long", year: "numeric" })
+    : "—"
+  const yearsOfLoyalty = memberSince ? Math.max(0, now.getFullYear() - memberSince.getFullYear()) : 0
+  const daysToRenewal = expiry ? Math.max(0, Math.ceil((expiry.getTime() - now.getTime()) / 86_400_000)) : null
+  const renewalPct = daysToRenewal !== null ? Math.min(100, Math.round((daysToRenewal / 365) * 100)) : 0
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-neutral-50 to-neutral-100 dark:from-neutral-900 dark:to-neutral-800">
       <DashboardHeader />
@@ -29,22 +56,24 @@ export default function MembershipPage() {
             <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 dark:from-purple-950 dark:to-purple-900 dark:border-purple-800">
               <CardHeader className="pb-2">
                 <CardTitle className="text-purple-900 dark:text-purple-100">Current Tier</CardTitle>
-                <CardDescription>Diamond Member</CardDescription>
+                <CardDescription>{tier} Member</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center gap-2">
                   <Award className="h-6 w-6 text-purple-700 dark:text-purple-300" />
-                  <div className="text-xl font-bold text-purple-700 dark:text-purple-300">Diamond</div>
+                  <div className="text-xl font-bold text-purple-700 dark:text-purple-300">{tier}</div>
                 </div>
-                <div className="mt-2">
-                  <div className="flex justify-between text-sm mb-1">
-                    <span>Renewal in 45 days</span>
-                    <span className="font-medium">85%</span>
+                {daysToRenewal !== null && (
+                  <div className="mt-2">
+                    <div className="flex justify-between text-sm mb-1">
+                      <span>Renewal in {daysToRenewal} days</span>
+                      <span className="font-medium">{renewalPct}%</span>
+                    </div>
+                    <Progress value={renewalPct} className="h-2 bg-purple-200 dark:bg-purple-800">
+                      <div className="h-full bg-gradient-to-r from-purple-500 to-purple-700 dark:from-purple-400 dark:to-purple-600 rounded-full" />
+                    </Progress>
                   </div>
-                  <Progress value={85} className="h-2 bg-purple-200 dark:bg-purple-800">
-                    <div className="h-full bg-gradient-to-r from-purple-500 to-purple-700 dark:from-purple-400 dark:to-purple-600 rounded-full" />
-                  </Progress>
-                </div>
+                )}
               </CardContent>
             </Card>
 
@@ -56,10 +85,13 @@ export default function MembershipPage() {
               <CardContent>
                 <div className="flex items-center gap-2">
                   <Calendar className="h-6 w-6 text-amber-700 dark:text-amber-300" />
-                  <div className="text-xl font-bold text-amber-700 dark:text-amber-300">June 2021</div>
+                  <div className="text-xl font-bold text-amber-700 dark:text-amber-300">{sinceLabel}</div>
                 </div>
                 <div className="mt-2 text-sm text-muted-foreground">
-                  <span className="font-medium">4 years</span> of loyalty with Kuriftu Resort
+                  <span className="font-medium">
+                    {yearsOfLoyalty} {yearsOfLoyalty === 1 ? "year" : "years"}
+                  </span>{" "}
+                  of loyalty with Kuriftu Resort
                 </div>
               </CardContent>
             </Card>
@@ -72,10 +104,15 @@ export default function MembershipPage() {
               <CardContent>
                 <div className="flex items-center gap-2">
                   <CreditCard className="h-6 w-6 text-emerald-700 dark:text-emerald-300" />
-                  <div className="text-xl font-bold text-emerald-700 dark:text-emerald-300">$750.00</div>
+                  <div className="text-xl font-bold text-emerald-700 dark:text-emerald-300">
+                    {TIER_FEE[tier] ?? "$0.00"}
+                  </div>
                 </div>
                 <div className="mt-2 text-sm text-muted-foreground">
-                  Due on <span className="font-medium">June 15, 2025</span>
+                  Due on{" "}
+                  <span className="font-medium">
+                    {expiry ? expiry.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "—"}
+                  </span>
                 </div>
               </CardContent>
             </Card>
@@ -88,11 +125,13 @@ export default function MembershipPage() {
             </CardHeader>
             <CardContent>
               <MembershipCard
-                name="Sarah Johnson"
-                memberId="DM-78912345"
-                tier="Diamond"
-                since="2021"
-                expiryDate="12/2025"
+                name={fullName}
+                memberId={user?.membershipId ?? "—"}
+                tier={tier}
+                since={memberSince ? memberSince.getFullYear().toString() : "—"}
+                expiryDate={
+                  expiry ? expiry.toLocaleDateString("en-US", { month: "2-digit", year: "numeric" }) : "—"
+                }
               />
             </CardContent>
             <CardFooter>

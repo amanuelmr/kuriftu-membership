@@ -1,69 +1,117 @@
-import { Award, Check } from "lucide-react"
+'use client'
+
+import { useState } from "react"
+import { Award, Check, Loader2 } from "lucide-react"
+import { toast } from "sonner"
+import { mutate } from "swr"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
+import { useUser, usePointsBalance } from "@/lib/hooks"
+import { upgradeMembership, initializePayment } from "@/lib/api"
+
+const TIER_RANK: Record<string, number> = { Basic: 0, Golden: 1, Platinum: 2, Diamond: 3 }
+
+const ALL_TIERS = [
+  {
+    name: "Golden",
+    rank: 1,
+    price: "$100",
+    color: "amber",
+    description: "Perfect for first-time or occasional visitors seeking enhanced experiences.",
+    benefits: [
+      "10% discount on accommodations",
+      "Early check-in when available",
+      "Welcome amenity upon arrival",
+      "Member-only promotions",
+      "Birthday special offer",
+      "5% discount at resort restaurants",
+    ],
+    pointsRequired: 10000,
+  },
+  {
+    name: "Platinum",
+    rank: 2,
+    price: "$350",
+    color: "slate",
+    description: "Designed for regular guests who appreciate premium service and exclusive access.",
+    benefits: [
+      "15% discount on accommodations",
+      "Guaranteed late checkout (2 PM)",
+      "Complimentary 30-min spa treatment",
+      "Room upgrade when available",
+      "Priority restaurant reservations",
+      "Exclusive access to member events",
+      "Dedicated concierge service",
+      "10% discount at resort restaurants",
+    ],
+    pointsRequired: 25000,
+  },
+  {
+    name: "Diamond",
+    rank: 3,
+    price: "$750",
+    color: "purple",
+    description: "The ultimate luxury experience for our most valued guests.",
+    benefits: [
+      "25% discount on accommodations",
+      "Guaranteed room upgrade",
+      "Complimentary airport transfers",
+      "Personalized in-room amenities",
+      "Dedicated personal assistant",
+      "Exclusive access to private events",
+      "Complimentary 60-min spa treatment",
+      "20% discount at resort restaurants",
+      "Complimentary minibar",
+    ],
+    pointsRequired: 50000,
+  },
+]
 
 export function MembershipUpgradeOptions() {
-  const tiers = [
-    {
-      name: "Golden",
-      price: "$100",
-      color: "amber",
-      description: "Perfect for first-time or occasional visitors seeking enhanced experiences.",
-      benefits: [
-        "10% discount on accommodations",
-        "Early check-in when available",
-        "Welcome amenity upon arrival",
-        "Member-only promotions",
-        "Birthday special offer",
-        "5% discount at resort restaurants",
-      ],
-      pointsRequired: "10,000",
-      currentPoints: "12,450",
-      canAfford: true,
-    },
-    {
-      name: "Platinum",
-      price: "$350",
-      color: "slate",
-      description: "Designed for regular guests who appreciate premium service and exclusive access.",
-      benefits: [
-        "15% discount on accommodations",
-        "Guaranteed late checkout (2 PM)",
-        "Complimentary 30-min spa treatment",
-        "Room upgrade when available",
-        "Priority restaurant reservations",
-        "Exclusive access to member events",
-        "Dedicated concierge service",
-        "10% discount at resort restaurants",
-      ],
-      pointsRequired: "25,000",
-      currentPoints: "12,450",
-      canAfford: false,
-    },
-    {
-      name: "Diamond",
-      price: "$750",
-      color: "purple",
-      description: "The ultimate luxury experience for our most valued guests.",
-      benefits: [
-        "25% discount on accommodations",
-        "Guaranteed room upgrade",
-        "Complimentary airport transfers",
-        "Personalized in-room amenities",
-        "Dedicated personal assistant",
-        "Exclusive access to private events",
-        "Complimentary 60-min spa treatment",
-        "20% discount at resort restaurants",
-        "Complimentary minibar",
-      ],
-      pointsRequired: "50,000",
-      currentPoints: "12,450",
-      canAfford: false,
-      current: true,
-    },
-  ]
+  const { user } = useUser()
+  const { pointsBalance } = usePointsBalance()
+
+  const currentTier = user?.membershipTier ?? "Basic"
+  const currentPointsNum = pointsBalance?.available ?? 0
+  const currentRank = TIER_RANK[currentTier] ?? 0
+
+  // Only tiers above the member's current tier are upgrades.
+  const tiers = ALL_TIERS.filter((t) => t.rank > currentRank)
+
+  // Which tier is currently processing (name), and via which flow.
+  const [processing, setProcessing] = useState<string | null>(null)
+
+  async function upgradeWithPoints(tierName: string) {
+    try {
+      setProcessing(tierName)
+      await upgradeMembership(tierName)
+      await Promise.all([mutate("user"), mutate("points/balance")])
+      toast.success(`You're now a ${tierName} member!`)
+    } catch {
+      toast.error("Upgrade failed. Please try again.")
+    } finally {
+      setProcessing(null)
+    }
+  }
+
+  async function purchaseUpgrade(tierName: string, price: string) {
+    try {
+      setProcessing(tierName)
+      const amount = price.replace(/[^0-9.]/g, "")
+      const { checkoutUrl } = await initializePayment({
+        amount,
+        currency: "ETB",
+        description: `${tierName} membership upgrade`,
+      })
+      // Hand off to the Chapa hosted checkout (mock returns a local URL).
+      window.location.href = checkoutUrl
+    } catch {
+      toast.error("Could not start payment. Please try again.")
+      setProcessing(null)
+    }
+  }
 
   const colorClasses = {
     amber: {
@@ -97,87 +145,94 @@ export function MembershipUpgradeOptions() {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-6 md:grid-cols-3">
-        {tiers.map((tier) => {
-          const currentPointsNum = Number.parseInt(tier.currentPoints.replace(/,/g, ""))
-          const pointsRequiredNum = Number.parseInt(tier.pointsRequired.replace(/,/g, ""))
-          const progressPercentage = Math.min(Math.round((currentPointsNum / pointsRequiredNum) * 100), 100)
+      {tiers.length === 0 ? (
+        <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 dark:from-purple-950 dark:to-purple-900 dark:border-purple-800">
+          <CardContent className="flex items-center gap-3 p-6">
+            <Award className="h-8 w-8 text-purple-700 dark:text-purple-300" />
+            <div>
+              <h3 className="text-lg font-bold text-purple-900 dark:text-purple-100">
+                You&apos;re at our highest tier — {currentTier}
+              </h3>
+              <p className="text-muted-foreground">There are no higher tiers to upgrade to. Enjoy every benefit.</p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-6 md:grid-cols-3">
+          {tiers.map((tier) => {
+            const canAfford = currentPointsNum >= tier.pointsRequired
+            const progressPercentage = Math.min(Math.round((currentPointsNum / tier.pointsRequired) * 100), 100)
 
-          return (
-            <Card
-              key={tier.name}
-              className={`overflow-hidden transition-all ${colorClasses[tier.color as keyof typeof colorClasses].bg} ${
-                colorClasses[tier.color as keyof typeof colorClasses].border
-              } ${tier.current ? "ring-2 ring-primary" : ""}`}
-            >
-              {tier.current && (
-                <div className="absolute -top-4 left-0 right-0 mx-auto w-fit rounded-full bg-primary px-3 py-1 text-xs font-medium text-white">
-                  Current Tier
-                </div>
-              )}
-              <CardHeader className={`pb-2 ${colorClasses[tier.color as keyof typeof colorClasses].heading}`}>
-                <div className="flex items-center gap-2">
-                  <Award className="h-5 w-5" />
-                  <CardTitle className="font-serif text-xl">{tier.name}</CardTitle>
-                </div>
-                <CardDescription>{tier.description}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="text-2xl font-bold">
-                  {tier.price}
-                  <span className="text-sm font-normal text-muted-foreground"> / year</span>
-                </div>
-
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span>
-                      {tier.currentPoints} / {tier.pointsRequired} points
-                    </span>
-                    <span className="font-medium">{progressPercentage}%</span>
+            return (
+              <Card
+                key={tier.name}
+                className={`overflow-hidden transition-all ${colorClasses[tier.color as keyof typeof colorClasses].bg} ${
+                  colorClasses[tier.color as keyof typeof colorClasses].border
+                }`}
+              >
+                <CardHeader className={`pb-2 ${colorClasses[tier.color as keyof typeof colorClasses].heading}`}>
+                  <div className="flex items-center gap-2">
+                    <Award className="h-5 w-5" />
+                    <CardTitle className="font-serif text-xl">{tier.name}</CardTitle>
                   </div>
-                  <Progress
-                    value={progressPercentage}
-                    className={`h-2 ${colorClasses[tier.color as keyof typeof colorClasses].progress}`}
-                  >
-                    <div
-                      className={`h-full rounded-full ${
-                        colorClasses[tier.color as keyof typeof colorClasses].progressFill
-                      }`}
-                    />
-                  </Progress>
-                </div>
+                  <CardDescription>{tier.description}</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="text-2xl font-bold">
+                    {tier.price}
+                    <span className="text-sm font-normal text-muted-foreground"> / year</span>
+                  </div>
 
-                <ul className="space-y-2">
-                  {tier.benefits.slice(0, 4).map((benefit, index) => (
-                    <li key={index} className="flex items-start gap-2 text-sm">
-                      <Check
-                        className={`h-4 w-4 mt-0.5 ${colorClasses[tier.color as keyof typeof colorClasses].icon}`}
+                  <div>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span>
+                        {currentPointsNum.toLocaleString()} / {tier.pointsRequired.toLocaleString()} points
+                      </span>
+                      <span className="font-medium">{progressPercentage}%</span>
+                    </div>
+                    <Progress
+                      value={progressPercentage}
+                      className={`h-2 ${colorClasses[tier.color as keyof typeof colorClasses].progress}`}
+                    >
+                      <div
+                        className={`h-full rounded-full ${
+                          colorClasses[tier.color as keyof typeof colorClasses].progressFill
+                        }`}
                       />
-                      <span>{benefit}</span>
-                    </li>
-                  ))}
-                  {tier.benefits.length > 4 && (
-                    <li className="text-sm text-muted-foreground">+{tier.benefits.length - 4} more benefits</li>
-                  )}
-                </ul>
-              </CardContent>
-              <CardFooter>
-                {tier.current ? (
-                  <Button className="w-full" variant="outline" disabled>
-                    Current Tier
+                    </Progress>
+                  </div>
+
+                  <ul className="space-y-2">
+                    {tier.benefits.slice(0, 4).map((benefit, index) => (
+                      <li key={index} className="flex items-start gap-2 text-sm">
+                        <Check
+                          className={`h-4 w-4 mt-0.5 ${colorClasses[tier.color as keyof typeof colorClasses].icon}`}
+                        />
+                        <span>{benefit}</span>
+                      </li>
+                    ))}
+                    {tier.benefits.length > 4 && (
+                      <li className="text-sm text-muted-foreground">+{tier.benefits.length - 4} more benefits</li>
+                    )}
+                  </ul>
+                </CardContent>
+                <CardFooter>
+                  <Button
+                    className={`w-full ${colorClasses[tier.color as keyof typeof colorClasses].button}`}
+                    disabled={processing !== null}
+                    onClick={() =>
+                      canAfford ? upgradeWithPoints(tier.name) : purchaseUpgrade(tier.name, tier.price)
+                    }
+                  >
+                    {processing === tier.name && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {canAfford ? "Upgrade with Points" : "Purchase Upgrade"}
                   </Button>
-                ) : (
-                  <>
-                    <Button className={`w-full ${colorClasses[tier.color as keyof typeof colorClasses].button}`}>
-                      {tier.canAfford ? "Upgrade with Points" : "Purchase Upgrade"}
-                    </Button>
-                  </>
-                )}
-              </CardFooter>
-            </Card>
-          )
-        })}
-      </div>
+                </CardFooter>
+              </Card>
+            )
+          })}
+        </div>
+      )}
 
       <Card>
         <CardHeader>

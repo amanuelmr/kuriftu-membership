@@ -1,7 +1,11 @@
 'use client'
+import { useState } from "react"
 import { Award, ShoppingBag, Hotel, Utensils, SpadeIcon as Spa, Users } from "lucide-react"
+import { toast } from "sonner"
+import { mutate } from "swr"
 
 import { usePointsBalance, useUser } from "@/lib/hooks"
+import { upgradeMembership, initializePayment } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -12,6 +16,51 @@ import { PointsHistoryTable } from "@/components/points-history-table"
 import { MembershipUpgradeCard } from "@/components/membership-upgrade-card"
 import { ProductCard } from "@/components/product-card"
 
+// Tier ladder. Only tiers ranked ABOVE the member's current tier are offered
+// as upgrades (a Diamond member sees none — they're already at the top).
+const TIER_RANK: Record<string, number> = { Basic: 0, Golden: 1, Platinum: 2, Diamond: 3 }
+
+const UPGRADE_TIERS = [
+  {
+    tier: "Golden",
+    rank: 1,
+    pointsRequired: 10000,
+    color: "amber" as const,
+    benefits: [
+      "10% discount on accommodations",
+      "Early check-in when available",
+      "Welcome amenity upon arrival",
+      "5% discount at resort restaurants",
+    ],
+  },
+  {
+    tier: "Platinum",
+    rank: 2,
+    pointsRequired: 25000,
+    color: "slate" as const,
+    benefits: [
+      "15% discount on accommodations",
+      "Guaranteed late checkout",
+      "Complimentary spa treatment",
+      "Room upgrade when available",
+      "10% discount at resort restaurants",
+    ],
+  },
+  {
+    tier: "Diamond",
+    rank: 3,
+    pointsRequired: 50000,
+    color: "purple" as const,
+    benefits: [
+      "25% discount on accommodations",
+      "Guaranteed room upgrade",
+      "Complimentary airport transfers",
+      "Dedicated personal assistant",
+      "20% discount at resort restaurants",
+    ],
+  },
+]
+
 export default function PointsPage() {
   const { pointsBalance } = usePointsBalance()
   const { user } = useUser()
@@ -19,6 +68,39 @@ export default function PointsPage() {
   const points = pointsBalance?.available ?? 0
   const lifetime = pointsBalance?.lifetime ?? 0
   const tier = user?.membershipTier ?? "Basic"
+
+  const currentRank = TIER_RANK[tier] ?? 0
+  const upgradeOptions = UPGRADE_TIERS.filter((t) => t.rank > currentRank)
+
+  const [processing, setProcessing] = useState<string | null>(null)
+
+  async function upgradeWithPoints(tierName: string) {
+    try {
+      setProcessing(tierName)
+      await upgradeMembership(tierName)
+      await Promise.all([mutate("user"), mutate("points/balance")])
+      toast.success(`You're now a ${tierName} member!`)
+    } catch {
+      toast.error("Upgrade failed. Please try again.")
+    } finally {
+      setProcessing(null)
+    }
+  }
+
+  async function purchaseUpgrade(tierName: string, pointsRequired: number) {
+    try {
+      setProcessing(tierName)
+      const { checkoutUrl } = await initializePayment({
+        amount: String(pointsRequired),
+        currency: "ETB",
+        description: `${tierName} membership upgrade`,
+      })
+      window.location.href = checkoutUrl
+    } catch {
+      toast.error("Could not start payment. Please try again.")
+      setProcessing(null)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-neutral-50 to-neutral-100 dark:from-neutral-900 dark:to-neutral-800">
@@ -89,50 +171,38 @@ export default function PointsPage() {
                   <Award className="h-6 w-6 text-primary" />
                   Upgrade Your Membership
                 </h2>
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                  <MembershipUpgradeCard
-                    tier="Golden"
-                    pointsRequired="10,000"
-                    currentPoints="12,450"
-                    benefits={[
-                      "10% discount on accommodations",
-                      "Early check-in when available",
-                      "Welcome amenity upon arrival",
-                      "5% discount at resort restaurants",
-                    ]}
-                    color="amber"
-                    canAfford={true}
-                  />
-                  <MembershipUpgradeCard
-                    tier="Platinum"
-                    pointsRequired="25,000"
-                    currentPoints="12,450"
-                    benefits={[
-                      "15% discount on accommodations",
-                      "Guaranteed late checkout",
-                      "Complimentary spa treatment",
-                      "Room upgrade when available",
-                      "10% discount at resort restaurants",
-                    ]}
-                    color="slate"
-                    canAfford={false}
-                  />
-                  <MembershipUpgradeCard
-                    tier="Diamond"
-                    pointsRequired="50,000"
-                    currentPoints="12,450"
-                    benefits={[
-                      "25% discount on accommodations",
-                      "Guaranteed room upgrade",
-                      "Complimentary airport transfers",
-                      "Dedicated personal assistant",
-                      "20% discount at resort restaurants",
-                    ]}
-                    color="purple"
-                    canAfford={false}
-                    current={true}
-                  />
-                </div>
+                {upgradeOptions.length === 0 ? (
+                  <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 dark:from-purple-950 dark:to-purple-900 dark:border-purple-800">
+                    <CardContent className="flex items-center gap-3 p-6">
+                      <Award className="h-8 w-8 text-purple-700 dark:text-purple-300" />
+                      <div>
+                        <h3 className="text-lg font-bold text-purple-900 dark:text-purple-100">
+                          You&apos;re at our highest tier — {tier}
+                        </h3>
+                        <p className="text-muted-foreground">
+                          You already enjoy every membership benefit Kuriftu offers.
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                    {upgradeOptions.map((t) => (
+                      <MembershipUpgradeCard
+                        key={t.tier}
+                        tier={t.tier}
+                        pointsRequired={t.pointsRequired.toLocaleString()}
+                        currentPoints={points.toLocaleString()}
+                        benefits={t.benefits}
+                        color={t.color}
+                        canAfford={points >= t.pointsRequired}
+                        isProcessing={processing === t.tier}
+                        onUpgrade={() => upgradeWithPoints(t.tier)}
+                        onPurchase={() => purchaseUpgrade(t.tier, t.pointsRequired)}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div>
