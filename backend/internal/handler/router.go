@@ -14,7 +14,7 @@ import (
 
 // Router wires all routes. New resource handlers are registered here as the
 // backend grows through the planned phases.
-func Router(authMgr *auth.Manager, corsOrigins []string, users *UserHandler) http.Handler {
+func Router(authMgr *auth.Manager, corsOrigins []string, users *UserHandler, loyalty *LoyaltyHandler) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(chimw.RequestID)
@@ -42,8 +42,18 @@ func Router(authMgr *auth.Manager, corsOrigins []string, users *UserHandler) htt
 		// Bearer-protected
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.Authenticator(authMgr))
+
 			r.Get("/users/me", users.Me)
 			r.Put("/users/me", users.UpdateMe)
+
+			r.Get("/points/balance", loyalty.PointsBalance)
+			r.Get("/points/history", loyalty.PointsHistory)
+
+			r.Get("/rewards", loyalty.Rewards)
+			r.Post("/rewards/redeem", loyalty.RedeemReward)
+
+			r.Get("/membership/benefits", loyalty.MembershipBenefits)
+			r.Post("/membership/upgrade", loyalty.UpgradeMembership)
 		})
 	})
 

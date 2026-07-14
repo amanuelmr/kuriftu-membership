@@ -56,6 +56,45 @@ func (ns NullMembershipTier) Value() (driver.Value, error) {
 	return string(ns.MembershipTier), nil
 }
 
+type MembershipBenefit struct {
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
+	Golden    string `json:"golden"`
+	Platinum  string `json:"platinum"`
+	Diamond   string `json:"diamond"`
+	SortOrder int32  `json:"sort_order"`
+}
+
+type PointsTransaction struct {
+	ID           int64     `json:"id"`
+	UserID       uuid.UUID `json:"user_id"`
+	OccurredAt   time.Time `json:"occurred_at"`
+	Description  string    `json:"description"`
+	Category     string    `json:"category"`
+	TxnType      string    `json:"txn_type"`
+	Points       int64     `json:"points"`
+	Amount       string    `json:"amount"`
+	BalanceAfter int64     `json:"balance_after"`
+}
+
+type Redemption struct {
+	ID          uuid.UUID `json:"id"`
+	UserID      uuid.UUID `json:"user_id"`
+	RewardID    uuid.UUID `json:"reward_id"`
+	PointsSpent int64     `json:"points_spent"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+type Reward struct {
+	ID             uuid.UUID `json:"id"`
+	Image          string    `json:"image"`
+	Title          string    `json:"title"`
+	Description    string    `json:"description"`
+	PointsRequired int64     `json:"points_required"`
+	Category       string    `json:"category"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
 type User struct {
 	ID             uuid.UUID      `json:"id"`
 	FirstName      string         `json:"first_name"`

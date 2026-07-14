@@ -8,13 +8,25 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Querier interface {
+	AddUserPoints(ctx context.Context, arg AddUserPointsParams) (int64, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	// Returns no row when the balance is insufficient, letting the caller reject
+	// the redemption atomically.
+	DeductUserPoints(ctx context.Context, arg DeductUserPointsParams) (int64, error)
+	GetReward(ctx context.Context, id uuid.UUID) (Reward, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
+	InsertPointsTransaction(ctx context.Context, arg InsertPointsTransactionParams) (PointsTransaction, error)
+	InsertRedemption(ctx context.Context, arg InsertRedemptionParams) (Redemption, error)
+	ListMembershipBenefits(ctx context.Context) ([]MembershipBenefit, error)
+	ListPointsHistory(ctx context.Context, userID uuid.UUID) ([]PointsTransaction, error)
+	ListRewards(ctx context.Context, category pgtype.Text) ([]Reward, error)
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
+	UpdateUserTier(ctx context.Context, arg UpdateUserTierParams) (User, error)
 }
 
 var _ Querier = (*Queries)(nil)

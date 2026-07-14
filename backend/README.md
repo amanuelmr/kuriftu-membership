@@ -68,6 +68,12 @@ Base path `/api`.
 | POST   | `/auth/login`   | –      | `{email,password}` → `{token,user}` |
 | GET    | `/users/me`     | Bearer | current user |
 | PUT    | `/users/me`     | Bearer | partial profile update |
+| GET    | `/points/balance` | Bearer | `{available, lifetime}` |
+| GET    | `/points/history` | Bearer | points ledger, newest first |
+| GET    | `/rewards`        | Bearer | rewards catalog (`?category=` optional) |
+| POST   | `/rewards/redeem` | Bearer | `{rewardId}`; atomic deduct, 422 if short |
+| GET    | `/membership/benefits` | Bearer | tier comparison |
+| POST   | `/membership/upgrade`  | Bearer | `{tier}` → updated user |
 
-Remaining endpoints (points, rewards, membership, bookings, offers, survey,
-payments) are planned — see the project plan.
+Remaining endpoints (bookings, offers, survey, payments) are planned — see the
+project plan.
