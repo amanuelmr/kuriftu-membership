@@ -73,7 +73,7 @@ func run() error {
 	userHandler := handler.NewUserHandler(userSvc)
 	loyaltyHandler := handler.NewLoyaltyHandler(loyaltySvc)
 	catalogHandler := handler.NewCatalogHandler(catalogSvc)
-	paymentHandler := handler.NewPaymentHandler(paymentSvc)
+	paymentHandler := handler.NewPaymentHandler(paymentSvc, cfg.ChapaWebhookSecret)
 
 	router := handler.Router(authMgr, cfg.CORSOrigins, userHandler, loyaltyHandler, catalogHandler, paymentHandler)
 

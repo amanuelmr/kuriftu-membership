@@ -1,7 +1,13 @@
 package handler
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
+	"io"
+	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -13,10 +19,13 @@ import (
 
 type PaymentHandler struct {
 	payments *service.PaymentService
+	// webhookSecret verifies Chapa-Signature on webhook calls; empty (dev/
+	// mock mode) skips verification.
+	webhookSecret string
 }
 
-func NewPaymentHandler(payments *service.PaymentService) *PaymentHandler {
-	return &PaymentHandler{payments: payments}
+func NewPaymentHandler(payments *service.PaymentService, webhookSecret string) *PaymentHandler {
+	return &PaymentHandler{payments: payments, webhookSecret: webhookSecret}
 }
 
 // PaymentMethods handles GET /api/payment-methods.
@@ -95,7 +104,9 @@ func (h *PaymentHandler) PaymentHistory(w http.ResponseWriter, r *http.Request) 
 }
 
 type initPaymentRequest struct {
-	Amount      string `json:"amount" validate:"required"`
+	// Amount is required for general payments but ignored for membership
+	// upgrades, whose price comes from the server-side tier catalog.
+	Amount      string `json:"amount"`
 	Currency    string `json:"currency"`
 	Description string `json:"description"`
 	Purpose     string `json:"purpose"`
@@ -123,10 +134,81 @@ func (h *PaymentHandler) InitializePayment(w http.ResponseWriter, r *http.Reques
 		TargetTier:  req.TargetTier,
 	})
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "could not start payment")
+		switch {
+		case errors.Is(err, service.ErrInvalidUpgrade):
+			writeError(w, http.StatusBadRequest, "invalid membership upgrade")
+		case errors.Is(err, service.ErrAmountRequired):
+			writeError(w, http.StatusBadRequest, "amount is required")
+		default:
+			writeError(w, http.StatusInternalServerError, "could not start payment")
+		}
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"checkoutUrl": res.CheckoutURL, "txRef": res.TxRef})
+}
+
+// Webhook handles POST /api/payments/webhook — Chapa's server-to-server
+// payment notification. It confirms the referenced payment with Chapa
+// directly, so a forged tx_ref can't mark anything paid; the signature check
+// (when a secret is configured) rejects third-party noise outright.
+func (h *PaymentHandler) Webhook(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "could not read body")
+		return
+	}
+
+	if h.webhookSecret != "" && !validWebhookSignature(body, r, h.webhookSecret) {
+		writeError(w, http.StatusUnauthorized, "invalid signature")
+		return
+	}
+
+	var payload struct {
+		TxRef  string `json:"tx_ref"`
+		TrxRef string `json:"trx_ref"`
+	}
+	_ = json.Unmarshal(body, &payload)
+	txRef := payload.TxRef
+	if txRef == "" {
+		txRef = payload.TrxRef
+	}
+	if txRef == "" {
+		txRef = r.URL.Query().Get("tx_ref")
+	}
+	if txRef == "" {
+		txRef = r.URL.Query().Get("trx_ref")
+	}
+	if txRef == "" {
+		writeError(w, http.StatusBadRequest, "missing tx_ref")
+		return
+	}
+
+	if _, err := h.payments.ConfirmPayment(r.Context(), txRef); err != nil {
+		if errors.Is(err, service.ErrPaymentNotFound) {
+			writeError(w, http.StatusNotFound, "payment not found")
+			return
+		}
+		slog.Error("webhook confirm failed", "txRef", txRef, "err", err)
+		writeError(w, http.StatusInternalServerError, "could not confirm payment")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// validWebhookSignature checks Chapa's HMAC-SHA256 hex signature of the raw
+// body, sent as Chapa-Signature (or x-chapa-signature).
+func validWebhookSignature(body []byte, r *http.Request, secret string) bool {
+	sig := r.Header.Get("Chapa-Signature")
+	if sig == "" {
+		sig = r.Header.Get("x-chapa-signature")
+	}
+	if sig == "" {
+		return false
+	}
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write(body)
+	expected := hex.EncodeToString(mac.Sum(nil))
+	return hmac.Equal([]byte(expected), []byte(sig))
 }
 
 // VerifyPayment handles GET /api/payments/verify/{txRef}.

@@ -126,21 +126,66 @@ func (s *LoyaltyService) ListBenefits(ctx context.Context) ([]repository.Members
 	return s.q.ListMembershipBenefits(ctx)
 }
 
-// UpgradeTier sets the user's membership tier after validating it.
+// UpgradeTier upgrades the user to a higher tier by spending points. The
+// target must outrank the current tier and the catalog's points cost is
+// deducted atomically with the tier change (previously this endpoint set any
+// tier for free).
 func (s *LoyaltyService) UpgradeTier(ctx context.Context, userID uuid.UUID, tier string) (repository.User, error) {
-	t, ok := validTiers[tier]
-	if !ok {
-		return repository.User{}, ErrInvalidTier
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return repository.User{}, fmt.Errorf("begin tx: %w", err)
 	}
-	user, err := s.q.UpdateUserTier(ctx, repository.UpdateUserTierParams{
-		ID:             userID,
-		MembershipTier: t,
-	})
+	defer tx.Rollback(ctx) // no-op after a successful commit
+
+	qtx := s.q.WithTx(tx)
+
+	user, err := qtx.GetUserByID(ctx, userID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return repository.User{}, ErrUserNotFound
 		}
+		return repository.User{}, fmt.Errorf("get user: %w", err)
+	}
+
+	offer, err := upgradeOffer(string(user.MembershipTier), tier)
+	if err != nil {
+		return repository.User{}, err
+	}
+
+	// Deduct only if the balance covers the cost (enforced in SQL).
+	newBalance, err := qtx.DeductUserPoints(ctx, repository.DeductUserPointsParams{
+		ID:     userID,
+		Points: offer.PointsRequired,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return repository.User{}, ErrInsufficientPoints
+		}
+		return repository.User{}, fmt.Errorf("deduct points: %w", err)
+	}
+
+	if _, err := qtx.InsertPointsTransaction(ctx, repository.InsertPointsTransactionParams{
+		UserID:       userID,
+		Description:  "Membership upgrade to " + offer.Tier,
+		Category:     "points",
+		TxnType:      "redeemed",
+		Points:       offer.PointsRequired,
+		Amount:       "",
+		BalanceAfter: newBalance,
+	}); err != nil {
+		return repository.User{}, fmt.Errorf("insert transaction: %w", err)
+	}
+
+	updated, err := qtx.UpdateUserTier(ctx, repository.UpdateUserTierParams{
+		ID:             userID,
+		MembershipTier: validTiers[tier],
+	})
+	if err != nil {
 		return repository.User{}, fmt.Errorf("update tier: %w", err)
 	}
-	return user, nil
+
+	if err := tx.Commit(ctx); err != nil {
+		return repository.User{}, fmt.Errorf("commit: %w", err)
+	}
+	return updated, nil
 }

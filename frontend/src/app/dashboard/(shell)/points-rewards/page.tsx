@@ -91,25 +91,25 @@ export default function PointsPage() {
     try {
       setProcessing(tierName)
       await upgradeMembership(tierName)
-      await Promise.all([mutate("user"), mutate("points/balance")])
+      await Promise.all([mutate("user"), mutate("points/balance"), mutate("points/history")])
       toast.success(`You're now a ${tierName} member!`)
-    } catch {
-      toast.error("Upgrade failed. Please try again.")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Upgrade failed. Please try again.")
     } finally {
       setProcessing(null)
     }
   }
 
-  async function purchaseUpgrade(tierName: string, pointsRequired: number) {
+  // The backend prices upgrades from its tier catalog; we only say which
+  // tier we want.
+  async function purchaseUpgrade(tierName: string) {
     try {
       setProcessing(tierName)
       const { checkoutUrl } = await initializePayment({
-        amount: String(pointsRequired),
-        currency: "ETB",
-        description: `${tierName} membership upgrade`,
         purpose: "membership_upgrade",
         targetTier: tierName,
       })
+      if (!checkoutUrl) throw new Error("No checkout URL returned")
       window.location.href = checkoutUrl
     } catch {
       toast.error("Could not start payment. Please try again.")
@@ -209,7 +209,7 @@ export default function PointsPage() {
                   canAfford={points >= t.pointsRequired}
                   isProcessing={processing === t.tier}
                   onUpgrade={() => upgradeWithPoints(t.tier)}
-                  onPurchase={() => purchaseUpgrade(t.tier, t.pointsRequired)}
+                  onPurchase={() => purchaseUpgrade(t.tier)}
                 />
               ))}
             </div>

@@ -16,6 +16,7 @@ import (
 var (
 	ErrPaymentNotFound  = errors.New("payment not found")
 	ErrPaymentForbidden = errors.New("payment does not belong to this user")
+	ErrAmountRequired   = errors.New("amount is required")
 )
 
 // PurposeMembershipUpgrade marks a payment whose success should grant a tier.
@@ -86,9 +87,11 @@ type InitializeInput struct {
 	TargetTier  string
 }
 
-// InitializePayment opens a Chapa checkout for the given amount and records a
-// pending payment. The return URL carries the tx_ref so the return page can
-// verify it.
+// InitializePayment opens a Chapa checkout and records a pending payment. The
+// return URL carries the tx_ref so the return page can verify it. For
+// membership upgrades the amount, currency, and description come from the
+// server-side tier catalog — client-supplied values are ignored so a caller
+// can neither set their own price nor buy a tier below their current one.
 func (s *PaymentService) InitializePayment(ctx context.Context, userID uuid.UUID, in InitializeInput) (InitializePaymentResult, error) {
 	user, err := s.q.GetUserByID(ctx, userID)
 	if err != nil {
@@ -104,6 +107,17 @@ func (s *PaymentService) InitializePayment(ctx context.Context, userID uuid.UUID
 	purpose := in.Purpose
 	if purpose == "" {
 		purpose = "general"
+	}
+	if purpose == PurposeMembershipUpgrade {
+		offer, err := upgradeOffer(string(user.MembershipTier), in.TargetTier)
+		if err != nil {
+			return InitializePaymentResult{}, err
+		}
+		in.Amount = offer.PriceETB
+		in.Description = offer.Tier + " membership upgrade"
+		currency = "ETB"
+	} else if in.Amount == "" {
+		return InitializePaymentResult{}, ErrAmountRequired
 	}
 	txRef := "krf-" + uuid.NewString()
 
@@ -153,8 +167,24 @@ func (s *PaymentService) VerifyPayment(ctx context.Context, userID uuid.UUID, tx
 	if payment.UserID != userID {
 		return repository.Payment{}, ErrPaymentForbidden
 	}
+	return s.confirm(ctx, payment)
+}
 
-	ok, err := s.chapa.Verify(ctx, txRef)
+// ConfirmPayment is VerifyPayment without the ownership check, for the Chapa
+// webhook (which carries no authenticated user).
+func (s *PaymentService) ConfirmPayment(ctx context.Context, txRef string) (repository.Payment, error) {
+	payment, err := s.q.GetPaymentByTxRef(ctx, txRef)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return repository.Payment{}, ErrPaymentNotFound
+		}
+		return repository.Payment{}, fmt.Errorf("get payment: %w", err)
+	}
+	return s.confirm(ctx, payment)
+}
+
+func (s *PaymentService) confirm(ctx context.Context, payment repository.Payment) (repository.Payment, error) {
+	ok, err := s.chapa.Verify(ctx, payment.TxRef)
 	if err != nil {
 		return repository.Payment{}, err
 	}
@@ -163,17 +193,18 @@ func (s *PaymentService) VerifyPayment(ctx context.Context, userID uuid.UUID, tx
 		status = "completed"
 	}
 
-	updated, err := s.q.UpdatePaymentStatus(ctx, repository.UpdatePaymentStatusParams{TxRef: txRef, Status: status})
+	updated, err := s.q.UpdatePaymentStatus(ctx, repository.UpdatePaymentStatusParams{TxRef: payment.TxRef, Status: status})
 	if err != nil {
 		return repository.Payment{}, fmt.Errorf("update status: %w", err)
 	}
 
-	// Grant the purchased tier on success. Idempotent: re-verifying just re-sets
-	// the same tier. validTiers is defined in loyalty_service.go.
+	// Grant the purchased tier on success — to the payment's owner, not the
+	// caller. Idempotent: re-verifying just re-sets the same tier. validTiers
+	// is defined in loyalty_service.go.
 	if ok && updated.Purpose == PurposeMembershipUpgrade {
 		if _, valid := validTiers[updated.TargetTier]; valid {
 			if _, err := s.q.UpdateUserTier(ctx, repository.UpdateUserTierParams{
-				ID:             userID,
+				ID:             updated.UserID,
 				MembershipTier: validTiers[updated.TargetTier],
 			}); err != nil {
 				return repository.Payment{}, fmt.Errorf("grant tier: %w", err)
