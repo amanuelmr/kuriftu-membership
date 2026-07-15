@@ -4,8 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 interface ActivitySummaryProps {
   title: string
   value: string
-  change: string
-  changeType: "increase" | "decrease"
+  change?: string
+  changeType?: "increase" | "decrease"
   icon: React.ReactNode
   iconColor: string
   bgColor: string
@@ -29,13 +29,19 @@ export function ActivitySummary({
       </CardHeader>
       <CardContent>
         <div className="text-2xl font-bold">{value}</div>
-        <div className="mt-1 flex items-center text-xs">
-          <span className={changeType === "increase" ? "text-emerald-600" : "text-red-600"}>
+        {change ? (
+          <div className="mt-1 flex items-center text-xs">
+            <span className={changeType === "increase" ? "text-emerald-600" : "text-red-600"}>
+              <span className={iconColor}>{icon}</span>
+              {change}
+            </span>
+            <span className="text-muted-foreground ml-1">from last period</span>
+          </div>
+        ) : (
+          <div className="mt-1 flex items-center text-xs">
             <span className={iconColor}>{icon}</span>
-            {change}
-          </span>
-          <span className="text-muted-foreground ml-1">from last period</span>
-        </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   )

@@ -1,40 +1,55 @@
 "use client"
 
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "@/components/ui/chart"
+import { usePointsHistory } from "@/lib/hooks"
+
+interface MonthBucket {
+  name: string
+  earned: number
+  redeemed: number
+}
+
+// The last six calendar months (oldest first), each summing that month's
+// earned and redeemed points from the real transaction history.
+function bucketByMonth(history: { date: string; points: string; type: string }[]): MonthBucket[] {
+  const now = new Date()
+  const buckets: MonthBucket[] = []
+  const index = new Map<string, MonthBucket>()
+
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const key = `${d.getFullYear()}-${d.getMonth()}`
+    const bucket = { name: d.toLocaleDateString("en-US", { month: "short" }), earned: 0, redeemed: 0 }
+    buckets.push(bucket)
+    index.set(key, bucket)
+  }
+
+  for (const t of history) {
+    const d = new Date(t.date)
+    if (isNaN(d.getTime())) continue
+    const bucket = index.get(`${d.getFullYear()}-${d.getMonth()}`)
+    if (!bucket) continue
+    const points = Number(t.points) || 0
+    if (t.type === "earned") bucket.earned += points
+    else if (t.type === "redeemed") bucket.redeemed += points
+  }
+
+  return buckets
+}
 
 export function PointsChart() {
-  const data = [
-    {
-      name: "Jan",
-      earned: 1200,
-      redeemed: 0,
-    },
-    {
-      name: "Feb",
-      earned: 900,
-      redeemed: 500,
-    },
-    {
-      name: "Mar",
-      earned: 1500,
-      redeemed: 2500,
-    },
-    {
-      name: "Apr",
-      earned: 1800,
-      redeemed: 0,
-    },
-    {
-      name: "May",
-      earned: 1200,
-      redeemed: 1000,
-    },
-    {
-      name: "Jun",
-      earned: 2500,
-      redeemed: 1500,
-    },
-  ]
+  const { pointsHistory, isLoading } = usePointsHistory()
+  const history = pointsHistory ?? []
+  const data = bucketByMonth(history)
+  const empty = !isLoading && history.length === 0
+
+  if (empty) {
+    return (
+      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+        No points activity yet — your earning history will appear here.
+      </div>
+    )
+  }
 
   return (
     <ResponsiveContainer width="100%" height="100%">

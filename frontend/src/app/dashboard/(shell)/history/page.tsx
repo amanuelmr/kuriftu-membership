@@ -1,14 +1,38 @@
-import { ArrowDownRight, ArrowUpRight, Calendar, Filter, Search } from "lucide-react"
+'use client'
 
-import { Button } from "@/components/ui/button"
+import { useState } from "react"
+import { ArrowDownRight, ArrowUpRight, Calendar, Search } from "lucide-react"
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { DateRangePicker } from "@/components/date-range-picker"
 import { ActivityHistoryTable } from "@/components/activity-history-table"
 import { ActivitySummary } from "@/components/activity-summary"
+import { usePointsBalance, usePointsHistory } from "@/lib/hooks"
+
+const TABS = [
+  { value: "all", title: "All Activity", description: "Your complete activity history" },
+  { value: "points", title: "Points Activity", description: "Your points earning and redemption history" },
+  { value: "stays", title: "Stay History", description: "Your past and upcoming stays" },
+  { value: "dining", title: "Dining History", description: "Your restaurant and dining experiences" },
+  { value: "spa", title: "Spa & Wellness", description: "Your spa treatments and wellness activities" },
+] as const
 
 export default function HistoryPage() {
+  const [query, setQuery] = useState("")
+  const { pointsHistory } = usePointsHistory()
+  const { pointsBalance } = usePointsBalance()
+
+  const history = pointsHistory ?? []
+  const totalEarned = history
+    .filter((t) => t.type === "earned")
+    .reduce((sum, t) => sum + (Number(t.points) || 0), 0)
+  const totalRedeemed = history
+    .filter((t) => t.type === "redeemed")
+    .reduce((sum, t) => sum + (Number(t.points) || 0), 0)
+  const totalStays = history.filter((t) => t.category === "stays").length
+  const available = pointsBalance?.available ?? 0
+
   return (
     <>
     <div className="flex flex-col gap-2">
@@ -21,9 +45,7 @@ export default function HistoryPage() {
     <div className="grid gap-6 md:grid-cols-4">
       <ActivitySummary
         title="Total Points Earned"
-        value="24,850"
-        change="+1,780"
-        changeType="increase"
+        value={totalEarned.toLocaleString()}
         icon={<ArrowUpRight className="h-4 w-4" />}
         iconColor="text-emerald-600"
         bgColor="bg-emerald-50"
@@ -31,9 +53,7 @@ export default function HistoryPage() {
       />
       <ActivitySummary
         title="Total Points Redeemed"
-        value="12,400"
-        change="+2,500"
-        changeType="increase"
+        value={totalRedeemed.toLocaleString()}
         icon={<ArrowDownRight className="h-4 w-4" />}
         iconColor="text-amber-600"
         bgColor="bg-amber-50"
@@ -41,9 +61,7 @@ export default function HistoryPage() {
       />
       <ActivitySummary
         title="Total Stays"
-        value="18"
-        change="+3"
-        changeType="increase"
+        value={totalStays.toLocaleString()}
         icon={<Calendar className="h-4 w-4" />}
         iconColor="text-blue-600"
         bgColor="bg-blue-50"
@@ -51,31 +69,24 @@ export default function HistoryPage() {
       />
       <ActivitySummary
         title="Available Points"
-        value="12,450"
-        change="-720"
-        changeType="decrease"
-        icon={<ArrowDownRight className="h-4 w-4" />}
+        value={available.toLocaleString()}
+        icon={<ArrowUpRight className="h-4 w-4" />}
         iconColor="text-red-600"
         bgColor="bg-red-50"
         borderColor="border-red-200"
       />
     </div>
 
-    <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-      <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
-        <div className="relative w-full md:w-[300px]">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input type="search" placeholder="Search activity..." className="pl-8" />
-        </div>
-        <DateRangePicker />
-      </div>
-      <div className="flex gap-2 w-full md:w-auto">
-        <Button variant="outline" size="icon">
-          <Filter className="h-4 w-4" />
-          <span className="sr-only">Filter</span>
-        </Button>
-        <Button>Export History</Button>
-      </div>
+    <div className="relative w-full md:w-[300px]">
+      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+      <Input
+        type="search"
+        placeholder="Search activity..."
+        className="pl-8"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        aria-label="Search activity"
+      />
     </div>
 
     <Tabs defaultValue="all" className="w-full">
@@ -86,61 +97,19 @@ export default function HistoryPage() {
         <TabsTrigger value="dining">Dining</TabsTrigger>
         <TabsTrigger value="spa">Spa & Wellness</TabsTrigger>
       </TabsList>
-      <TabsContent value="all" className="mt-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>All Activity</CardTitle>
-            <CardDescription>Your complete activity history</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ActivityHistoryTable />
-          </CardContent>
-        </Card>
-      </TabsContent>
-      <TabsContent value="points" className="mt-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Points Activity</CardTitle>
-            <CardDescription>Your points earning and redemption history</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ActivityHistoryTable category="points" />
-          </CardContent>
-        </Card>
-      </TabsContent>
-      <TabsContent value="stays" className="mt-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Stay History</CardTitle>
-            <CardDescription>Your past and upcoming stays</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ActivityHistoryTable category="stays" />
-          </CardContent>
-        </Card>
-      </TabsContent>
-      <TabsContent value="dining" className="mt-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Dining History</CardTitle>
-            <CardDescription>Your restaurant and dining experiences</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ActivityHistoryTable category="dining" />
-          </CardContent>
-        </Card>
-      </TabsContent>
-      <TabsContent value="spa" className="mt-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Spa & Wellness</CardTitle>
-            <CardDescription>Your spa treatments and wellness activities</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ActivityHistoryTable category="spa" />
-          </CardContent>
-        </Card>
-      </TabsContent>
+      {TABS.map((tab) => (
+        <TabsContent key={tab.value} value={tab.value} className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>{tab.title}</CardTitle>
+              <CardDescription>{tab.description}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ActivityHistoryTable category={tab.value} query={query} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+      ))}
     </Tabs>
     </>
   )

@@ -11,21 +11,18 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { updateUserProfile } from "@/lib/api"
+import { useUser } from "@/lib/hooks"
 
+// Only the fields the backend's PUT /users/me actually persists.
 const profileFormSchema = z.object({
   firstName: z.string().min(2, "First name must be at least 2 characters"),
   lastName: z.string().min(2, "Last name must be at least 2 characters"),
-  email: z.string().email("Invalid email address"),
   phone: z.string().min(10, "Phone number must be at least 10 digits"),
-  address: z.string().min(5, "Address must be at least 5 characters"),
-  city: z.string().min(2, "City must be at least 2 characters"),
-  country: z.string().min(2, "Country must be at least 2 characters"),
-  bio: z.string().max(500, "Bio must be less than 500 characters"),
 })
 
 type ProfileFormData = z.infer<typeof profileFormSchema>
@@ -70,6 +67,7 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState("profile")
   const [notifications, setNotifications] = useState<NotificationSettings>(notificationSettings)
   const [isLoading, setIsLoading] = useState(false)
+  const { user, mutate } = useUser()
 
   const {
     register,
@@ -77,30 +75,30 @@ export default function SettingsPage() {
     formState: { errors },
   } = useForm<ProfileFormData>({
     resolver: zodResolver(profileFormSchema),
-    defaultValues: {
-      firstName: "Sarah",
-      lastName: "Johnson",
-      email: "sarah.johnson@example.com",
-      phone: "+1 (555) 123-4567",
-      address: "123 Main Street",
-      city: "New York",
-      country: "United States",
-      bio: "Avid traveler and food enthusiast. I love experiencing new cultures and cuisines.",
+    // `values` keeps the form in sync once the user loads.
+    values: {
+      firstName: user?.firstName ?? "",
+      lastName: user?.lastName ?? "",
+      phone: user?.phone ?? "",
     },
   })
 
-  const handleProfileSubmit = async () => {
+  const handleProfileSubmit = async (data: ProfileFormData) => {
     try {
       setIsLoading(true)
-      // TODO: Add API call to update profile
+      await updateUserProfile(data)
+      await mutate()
       toast.success("Profile updated successfully!")
     } catch (error) {
-      console.error(error)
-      toast.error("Failed to update profile")
+      toast.error(error instanceof Error ? error.message : "Failed to update profile")
     } finally {
       setIsLoading(false)
     }
   }
+
+  const initials = user
+    ? `${user.firstName?.[0] ?? ""}${user.lastName?.[0] ?? ""}`.toUpperCase() || "?"
+    : "?"
 
   const handleNotificationToggle = (channel: NotificationChannel, type: NotificationType) => {
     setNotifications((prev) => ({
@@ -149,12 +147,9 @@ export default function SettingsPage() {
             <CardContent className="space-y-6">
               <div className="flex flex-col items-center space-y-4">
                 <Avatar className="h-24 w-24">
-                  <AvatarImage src="/avatar.jpg" alt="Sarah Johnson" />
-                  <AvatarFallback className="text-2xl">SJ</AvatarFallback>
+                  <AvatarImage src={user?.avatar} alt={user ? `${user.firstName} ${user.lastName}` : "Member"} />
+                  <AvatarFallback className="text-2xl">{initials}</AvatarFallback>
                 </Avatar>
-                <Button variant="outline" size="sm">
-                  Change Avatar
-                </Button>
               </div>
 
               <div className="grid gap-6 md:grid-cols-2">
@@ -184,15 +179,8 @@ export default function SettingsPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  {...register("email")}
-                  className={errors.email ? "border-destructive" : ""}
-                />
-                {errors.email && (
-                  <p className="text-sm text-destructive">{errors.email.message}</p>
-                )}
+                <Input id="email" type="email" value={user?.email ?? ""} disabled readOnly />
+                <p className="text-sm text-muted-foreground">Email can&apos;t be changed here. Contact support if you need to update it.</p>
               </div>
 
               <div className="space-y-2">
@@ -205,55 +193,6 @@ export default function SettingsPage() {
                 />
                 {errors.phone && (
                   <p className="text-sm text-destructive">{errors.phone.message}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="address">Address</Label>
-                <Input
-                  id="address"
-                  {...register("address")}
-                  className={errors.address ? "border-destructive" : ""}
-                />
-                {errors.address && (
-                  <p className="text-sm text-destructive">{errors.address.message}</p>
-                )}
-              </div>
-
-              <div className="grid gap-6 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="city">City</Label>
-                  <Input
-                    id="city"
-                    {...register("city")}
-                    className={errors.city ? "border-destructive" : ""}
-                  />
-                  {errors.city && (
-                    <p className="text-sm text-destructive">{errors.city.message}</p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="country">Country</Label>
-                  <Input
-                    id="country"
-                    {...register("country")}
-                    className={errors.country ? "border-destructive" : ""}
-                  />
-                  {errors.country && (
-                    <p className="text-sm text-destructive">{errors.country.message}</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="bio">Bio</Label>
-                <Textarea
-                  id="bio"
-                  {...register("bio")}
-                  className={errors.bio ? "border-destructive" : ""}
-                />
-                {errors.bio && (
-                  <p className="text-sm text-destructive">{errors.bio.message}</p>
                 )}
               </div>
             </CardContent>

@@ -4,8 +4,8 @@ import { Award, ShoppingBag, Hotel, Utensils, SpadeIcon as Spa, Users } from "lu
 import { toast } from "sonner"
 import { mutate } from "swr"
 
-import { usePointsBalance, useUser } from "@/lib/hooks"
-import { upgradeMembership, initializePayment } from "@/lib/api"
+import { usePointsBalance, useRewards, useUser } from "@/lib/hooks"
+import { upgradeMembership, initializePayment, redeemReward } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -62,6 +62,7 @@ const UPGRADE_TIERS = [
 export default function PointsPage() {
   const { pointsBalance } = usePointsBalance()
   const { user } = useUser()
+  const { rewards, isLoading: rewardsLoading } = useRewards()
 
   const points = pointsBalance?.available ?? 0
   const lifetime = pointsBalance?.lifetime ?? 0
@@ -71,6 +72,20 @@ export default function PointsPage() {
   const upgradeOptions = UPGRADE_TIERS.filter((t) => t.rank > currentRank)
 
   const [processing, setProcessing] = useState<string | null>(null)
+  const [redeeming, setRedeeming] = useState<string | null>(null)
+
+  async function redeem(rewardId: string, title: string) {
+    try {
+      setRedeeming(rewardId)
+      await redeemReward(rewardId)
+      await Promise.all([mutate("points/balance"), mutate("points/history")])
+      toast.success(`Redeemed: ${title}`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not redeem this reward.")
+    } finally {
+      setRedeeming(null)
+    }
+  }
 
   async function upgradeWithPoints(tierName: string) {
     try {
@@ -206,56 +221,30 @@ export default function PointsPage() {
             <ShoppingBag className="h-6 w-6 text-primary" />
             Products & Experiences
           </h2>
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            <ProductCard
-              image="https://images.unsplash.com/photo-1544161515-4ab6ce6db874?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=8"
-              title="Luxury Spa Package"
-              description="90-minute signature massage with aromatherapy and facial treatment."
-              pointsRequired="5,000"
-              currentPoints="12,450"
-              canAfford={true}
-            />
-            <ProductCard
-              image="https://images.unsplash.com/photo-1414235077428-338989a2e8c0?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80"
-              title="Fine Dining Experience"
-              description="5-course tasting menu with wine pairing for two at our signature restaurant."
-              pointsRequired="7,500"
-              currentPoints="12,450"
-              canAfford={true}
-            />
-            <ProductCard
-              image="https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80"
-              title="Private Lake Excursion"
-              description="3-hour private boat tour of Lake Bishoftu with champagne and snacks."
-              pointsRequired="10,000"
-              currentPoints="12,450"
-              canAfford={true}
-            />
-            <ProductCard
-              image="https://images.unsplash.com/photo-1578683010236-d716f9a3f461?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80"
-              title="Free Night Stay"
-              description="One complimentary night in a Deluxe Room with breakfast included."
-              pointsRequired="15,000"
-              currentPoints="12,450"
-              canAfford={false}
-            />
-            <ProductCard
-              image="https://images.unsplash.com/photo-1563291074-2bf8677ac0e5?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80"
-              title="Kuriftu Luxury Bathrobe"
-              description="Premium cotton bathrobe with Kuriftu Resort logo embroidery."
-              pointsRequired="3,500"
-              currentPoints="12,450"
-              canAfford={true}
-            />
-            <ProductCard
-              image="https://images.unsplash.com/photo-1464219789935-c2d9d9aba644?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80"
-              title="Airport Transfer"
-              description="Luxury vehicle airport transfer service (one-way) with refreshments."
-              pointsRequired="2,000"
-              currentPoints="12,450"
-              canAfford={true}
-            />
-          </div>
+          {rewardsLoading ? (
+            <p className="text-muted-foreground py-8 text-center">Loading rewards…</p>
+          ) : (rewards ?? []).length === 0 ? (
+            <p className="text-muted-foreground py-8 text-center">No rewards available right now.</p>
+          ) : (
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {(rewards ?? []).map((reward) => {
+                const required = Number(reward.pointsRequired) || 0
+                return (
+                  <ProductCard
+                    key={reward.id}
+                    image={reward.image}
+                    title={reward.title}
+                    description={reward.description}
+                    pointsRequired={required.toLocaleString()}
+                    currentPoints={points.toLocaleString()}
+                    canAfford={points >= required}
+                    isRedeeming={redeeming === reward.id}
+                    onRedeem={() => redeem(reward.id, reward.title)}
+                  />
+                )
+              })}
+            </div>
+          )}
         </div>
       </TabsContent>
       <TabsContent value="history" className="mt-6">
