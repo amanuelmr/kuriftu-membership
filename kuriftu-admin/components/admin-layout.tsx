@@ -1,7 +1,7 @@
 import Link from "next/link"
 import Image from "next/image"
 import type { ReactNode } from "react"
-import { Home, Users, Gift, LogOut } from "lucide-react"
+import { Home, Users, Gift } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -30,18 +30,6 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           <NavItem href="/services" icon={<Gift className="mr-2 h-4 w-4" />}>
             Services
           </NavItem>
-          <div className="pt-4">
-            <Button
-              variant="outline"
-              className="w-full justify-start text-white border-white hover:bg-white/10"
-              asChild
-            >
-              <Link href="/logout" className="text-black">
-                <LogOut className="mr-2 h-4 w-4 " />
-                Logout
-              </Link>
-            </Button>
-          </div>
         </nav>
       </div>
 
@@ -89,17 +77,23 @@ function NavItem({ href, icon, children, className }: NavItemProps) {
 function MobileNav() {
   return (
     <div className="flex md:hidden">
-      <Button variant="ghost" size="icon" className="mr-2 text-kuriftu-primary">
-        <Home className="h-5 w-5" />
-        <span className="sr-only">Dashboard</span>
+      <Button variant="ghost" size="icon" className="mr-2 text-kuriftu-primary" asChild>
+        <Link href="/">
+          <Home className="h-5 w-5" />
+          <span className="sr-only">Dashboard</span>
+        </Link>
       </Button>
-      <Button variant="ghost" size="icon" className="mr-2 text-kuriftu-primary">
-        <Users className="h-5 w-5" />
-        <span className="sr-only">Customers</span>
+      <Button variant="ghost" size="icon" className="mr-2 text-kuriftu-primary" asChild>
+        <Link href="/customers">
+          <Users className="h-5 w-5" />
+          <span className="sr-only">Customers</span>
+        </Link>
       </Button>
-      <Button variant="ghost" size="icon" className="text-kuriftu-primary">
-        <Gift className="h-5 w-5" />
-        <span className="sr-only">Services</span>
+      <Button variant="ghost" size="icon" className="text-kuriftu-primary" asChild>
+        <Link href="/services">
+          <Gift className="h-5 w-5" />
+          <span className="sr-only">Services</span>
+        </Link>
       </Button>
     </div>
   )
