@@ -7,7 +7,6 @@ import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
-import Head from "next/head"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -34,11 +33,6 @@ const formSchema = z.object({
 
 type FormData = z.infer<typeof formSchema>
 
-// export const metadata: Metadata = {
-//   title: "Register | Kuriftu Resort",
-//   description: "Create your Kuriftu Resort membership account",
-// }
-
 export default function RegisterPage() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
@@ -55,7 +49,7 @@ export default function RegisterPage() {
       terms: false,
     },
   })
-//https://kuriftu-membership-backend-3.onrender.com/api/auth//login
+
   const onSubmit = async (data: FormData) => {
     try {
       setIsLoading(true)
@@ -77,10 +71,6 @@ export default function RegisterPage() {
   }
 
   return (
-    <>
-    <Head>
-        <title>Register | Kuriftu Resort</title>
-    </Head>
     <div className="min-h-screen grid md:grid-cols-2">
       <div className="hidden md:block relative">
         <Image src="https://images.unsplash.com/photo-1571896349842-33c89424de2d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1920&q=80" alt="Kuriftu Resort" fill className="object-cover" />
@@ -97,7 +87,7 @@ export default function RegisterPage() {
       <div className="flex flex-col justify-center p-8 md:p-12">
         <div className="mx-auto w-full max-w-sm">
           <div className="flex items-center gap-2 mb-8">
-            <Image src="https://www.kurifturesorts.com/_nuxt/img/logo.e2cce34.svg" alt="Kuriftu Resort Logo" width={40} height={40} className="h-10 w-auto" />
+            <Image src="/logo.svg" alt="Kuriftu Resort Logo" width={40} height={40} className="h-10 w-auto" />
           </div>
           <div className="space-y-2 mb-8">
             <h1 className="text-3xl font-bold">Create an Account</h1>
@@ -214,6 +204,5 @@ export default function RegisterPage() {
         </div>
       </div>
     </div>
-    </>
   )
 }

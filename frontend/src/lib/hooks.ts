@@ -13,26 +13,6 @@ import {
   getPaymentHistory
 } from "./api";
 
-// Custom fetcher for SWR that handles authentication
-// const fetcher = async (url: string) => {
-//   const token = localStorage.getItem("token");
-//   if (!token) {
-//     throw new Error("No authentication token found");
-//   }
-
-//   const response = await fetch(url, {
-//     headers: {
-//       Authorization: `Bearer ${token}`
-//     }
-//   });
-
-//   if (!response.ok) {
-//     throw new Error("An error occurred while fetching the data.");
-//   }
-
-//   return response.json();
-// };
-
 // User hooks
 export function useUser() {
   const { data, error, isLoading, mutate } = useSWR("user", getCurrentUser);

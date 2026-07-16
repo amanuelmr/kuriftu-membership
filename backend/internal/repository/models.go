@@ -101,6 +101,8 @@ type Payment struct {
 	PaymentMethod string    `json:"payment_method"`
 	CheckoutUrl   string    `json:"checkout_url"`
 	OccurredAt    time.Time `json:"occurred_at"`
+	Purpose       string    `json:"purpose"`
+	TargetTier    string    `json:"target_tier"`
 }
 
 type PaymentMethod struct {

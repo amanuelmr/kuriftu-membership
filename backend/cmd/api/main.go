@@ -67,13 +67,13 @@ func run() error {
 		queries,
 		chapaClient,
 		cfg.AppBaseURL+"/api/payments/webhook",
-		cfg.FrontendURL+"/dashboard/payments",
+		cfg.FrontendURL+"/dashboard/payment/return",
 	)
 
 	userHandler := handler.NewUserHandler(userSvc)
 	loyaltyHandler := handler.NewLoyaltyHandler(loyaltySvc)
 	catalogHandler := handler.NewCatalogHandler(catalogSvc)
-	paymentHandler := handler.NewPaymentHandler(paymentSvc)
+	paymentHandler := handler.NewPaymentHandler(paymentSvc, cfg.ChapaWebhookSecret)
 
 	router := handler.Router(authMgr, cfg.CORSOrigins, userHandler, loyaltyHandler, catalogHandler, paymentHandler)
 

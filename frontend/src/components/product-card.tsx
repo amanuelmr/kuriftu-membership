@@ -12,9 +12,11 @@ interface ProductCardProps {
   pointsRequired: string
   currentPoints: string
   canAfford: boolean
+  isRedeeming?: boolean
+  onRedeem?: () => void
 }
 
-export function ProductCard({ image, title, description, pointsRequired, currentPoints, canAfford }: ProductCardProps) {
+export function ProductCard({ image, title, description, pointsRequired, currentPoints, canAfford, isRedeeming, onRedeem }: ProductCardProps) {
   const currentPointsNum = Number.parseInt(currentPoints.replace(/,/g, ""))
   const pointsRequiredNum = Number.parseInt(pointsRequired.replace(/,/g, ""))
   const progressPercentage = Math.min(Math.round((currentPointsNum / pointsRequiredNum) * 100), 100)
@@ -54,8 +56,8 @@ export function ProductCard({ image, title, description, pointsRequired, current
       </CardContent>
       <CardFooter>
         {canAfford ? (
-          <Button className="w-full group">
-            Redeem Now
+          <Button className="w-full group" onClick={onRedeem} disabled={isRedeeming || !onRedeem}>
+            {isRedeeming ? "Redeeming…" : "Redeem Now"}
             <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
           </Button>
         ) : (

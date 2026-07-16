@@ -20,6 +20,9 @@ type Config struct {
 	Env            string // "development" | "production"
 	ChapaSecretKey string // CHASECK_TEST-... ; empty => Chapa runs in mock mode
 	ChapaBaseURL   string
+	// ChapaWebhookSecret verifies Chapa-Signature on webhook calls; empty
+	// (dev/mock) skips verification.
+	ChapaWebhookSecret string
 	AppBaseURL     string // public base URL of this API, for Chapa callbacks
 	FrontendURL    string // where Chapa returns the user after checkout
 }
@@ -38,8 +41,9 @@ func Load() (*Config, error) {
 		CORSOrigins: getEnvList("CORS_ORIGINS", []string{"http://localhost:3000"}),
 		Env:         getEnv("APP_ENV", "development"),
 
-		ChapaSecretKey: os.Getenv("CHAPA_SECRET_KEY"),
-		ChapaBaseURL:   getEnv("CHAPA_BASE_URL", "https://api.chapa.co/v1"),
+		ChapaSecretKey:     os.Getenv("CHAPA_SECRET_KEY"),
+		ChapaBaseURL:       getEnv("CHAPA_BASE_URL", "https://api.chapa.co/v1"),
+		ChapaWebhookSecret: os.Getenv("CHAPA_WEBHOOK_SECRET"),
 		AppBaseURL:     getEnv("APP_BASE_URL", "http://localhost:8080"),
 		FrontendURL:    getEnv("FRONTEND_URL", "http://localhost:3000"),
 	}

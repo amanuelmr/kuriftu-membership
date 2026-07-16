@@ -57,8 +57,13 @@ type initializeResponse struct {
 func (c *Client) Initialize(ctx context.Context, req InitializeRequest) (string, error) {
 	if c.Mock() {
 		// Simulated hosted-checkout page that immediately points back at our
-		// return URL so the flow can be driven end-to-end locally.
-		return fmt.Sprintf("%s?mock=1&tx_ref=%s", req.ReturnURL, req.TxRef), nil
+		// return URL (which already carries tx_ref) so the flow can be driven
+		// end-to-end locally. Use the correct query separator.
+		sep := "?"
+		if strings.Contains(req.ReturnURL, "?") {
+			sep = "&"
+		}
+		return req.ReturnURL + sep + "mock=1", nil
 	}
 
 	body, err := json.Marshal(req)

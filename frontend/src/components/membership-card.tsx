@@ -46,7 +46,7 @@ export function MembershipCard({ name, memberId, tier, since, expiryDate }: Memb
 
       <div className="flex justify-between items-start mb-8">
         <div className="flex items-center gap-3">
-          <Image src="https://www.kurifturesorts.com/_nuxt/img/logo.e2cce34.svg" alt="Kuriftu Resort Logo" width={40} height={40} className="h-12 w-auto" />
+          <Image src="/logo.svg" alt="Kuriftu Resort Logo" width={40} height={40} className="h-12 w-auto" />
           <div>
             <h3 className={`font-serif text-xl font-bold ${tierColors[tier].text}`}>Kuriftu Resort</h3>
             <p className={`text-sm ${tierColors[tier].text} opacity-80`}>Membership Card</p>

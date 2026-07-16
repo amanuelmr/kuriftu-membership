@@ -38,6 +38,9 @@ func Router(authMgr *auth.Manager, corsOrigins []string, users *UserHandler, loy
 		// Public
 		r.Post("/auth/signup", users.Signup)
 		r.Post("/auth/login", users.Login)
+		// Chapa server-to-server callback; must match the callback URL wired
+		// in main.go. Signature-verified when CHAPA_WEBHOOK_SECRET is set.
+		r.Post("/payments/webhook", payments.Webhook)
 
 		// Bearer-protected
 		r.Group(func(r chi.Router) {
@@ -53,6 +56,7 @@ func Router(authMgr *auth.Manager, corsOrigins []string, users *UserHandler, loy
 			r.Post("/rewards/redeem", loyalty.RedeemReward)
 
 			r.Get("/membership/benefits", loyalty.MembershipBenefits)
+			r.Get("/membership/tiers", loyalty.MembershipTiers)
 			r.Post("/membership/upgrade", loyalty.UpgradeMembership)
 
 			r.Get("/bookings", catalog.Bookings)

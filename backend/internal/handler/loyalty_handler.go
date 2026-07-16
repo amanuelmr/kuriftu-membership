@@ -136,12 +136,30 @@ func (h *LoyaltyHandler) UpgradeMembership(w http.ResponseWriter, r *http.Reques
 	}
 	user, err := h.loyalty.UpgradeTier(r.Context(), userID, req.Tier)
 	if err != nil {
-		if errors.Is(err, service.ErrInvalidTier) {
-			writeError(w, http.StatusBadRequest, "invalid membership tier")
-			return
+		switch {
+		case errors.Is(err, service.ErrInvalidTier), errors.Is(err, service.ErrInvalidUpgrade):
+			writeError(w, http.StatusBadRequest, "invalid membership upgrade")
+		case errors.Is(err, service.ErrInsufficientPoints):
+			writeError(w, http.StatusUnprocessableEntity, "insufficient points")
+		default:
+			writeError(w, http.StatusInternalServerError, "could not upgrade membership")
 		}
-		writeError(w, http.StatusInternalServerError, "could not upgrade membership")
 		return
 	}
 	writeJSON(w, http.StatusOK, model.NewUserDTO(user))
+}
+
+// MembershipTiers handles GET /api/membership/tiers: the purchasable tier
+// catalog (price + points cost), so the client never invents pricing.
+func (h *LoyaltyHandler) MembershipTiers(w http.ResponseWriter, _ *http.Request) {
+	offers := service.TierOffers()
+	out := make([]map[string]any, 0, len(offers))
+	for _, o := range offers {
+		out = append(out, map[string]any{
+			"tier":           o.Tier,
+			"priceETB":       o.PriceETB,
+			"pointsRequired": o.PointsRequired,
+		})
+	}
+	writeJSON(w, http.StatusOK, out)
 }

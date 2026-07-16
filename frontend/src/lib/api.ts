@@ -90,28 +90,58 @@ export interface Payment {
   paymentMethod: string;
 }
 
+interface ApiFetchOptions extends RequestInit {
+  /** Attach the Bearer token (default true; auth endpoints opt out). */
+  auth?: boolean;
+  /** Fallback error message when the server response has no usable one. */
+  errorMessage?: string;
+}
+
+// Single fetch path for every API call: base-URL join, auth header, JSON
+// encoding, and error unwrapping (the backend's envelope is {"error": "..."}).
+async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): Promise<T> {
+  const { auth = true, errorMessage, ...init } = options;
+  const headers: Record<string, string> = {
+    ...(init.headers as Record<string, string>),
+  };
+  if (init.body !== undefined) {
+    headers["Content-Type"] = "application/json";
+  }
+  if (auth) {
+    headers.Authorization = `Bearer ${getToken()}`;
+  }
+
+  const response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers });
+
+  if (!response.ok) {
+    let message = errorMessage ?? `Request failed (${response.status})`;
+    try {
+      const body = await response.json();
+      if (typeof body?.error === "string" && body.error) {
+        message = body.error;
+      }
+    } catch {
+      // Non-JSON error body; keep the fallback message.
+    }
+    throw new Error(message);
+  }
+
+  return response.json();
+}
+
 // API functions
 
 // Auth
-export async function login(email: string, password: string) {
-  try {
-    const response = await fetch(`${API_BASE_URL}/auth/login`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ email, password })
-    });
-
-    if (!response.ok) {
-      throw new Error("Login failed");
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error("Login error:", error);
-    throw error;
-  }
+export async function login(
+  email: string,
+  password: string
+): Promise<{ token: string; user?: User }> {
+  return apiFetch("/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+    auth: false,
+    errorMessage: "Login failed",
+  });
 }
 
 export async function register(userData: {
@@ -120,72 +150,26 @@ export async function register(userData: {
   email: string;
   phone: string;
   password: string;
-}) {
-  try {
-    const response = await fetch(`${API_BASE_URL}/auth/signup`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        fname: userData.fname,
-        lname: userData.lname,
-        email: userData.email,
-        phone: userData.phone,
-        password: userData.password
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error("Registration failed");
-    }
-    return await response.json();
-  } catch (error) {
-    console.error("Registration error:", error);
-    throw error;
-  }
+}): Promise<{ token: string; user?: User }> {
+  return apiFetch("/auth/signup", {
+    method: "POST",
+    body: JSON.stringify(userData),
+    auth: false,
+    errorMessage: "Registration failed",
+  });
 }
 
 // User
 export async function getCurrentUser(): Promise<User> {
-  try {
-    const response = await fetch(`${API_BASE_URL}/users/me`, {
-      headers: {
-        Authorization: `Bearer ${getToken()}`
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to fetch user data");
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error("Get user error:", error);
-    throw error;
-  }
+  return apiFetch("/users/me", { errorMessage: "Failed to fetch user data" });
 }
 
 export async function updateUserProfile(userData: Partial<User>) {
-  try {
-    const response = await fetch(`${API_BASE_URL}/users/me`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${getToken()}`
-      },
-      body: JSON.stringify(userData)
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to update profile");
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error("Update profile error:", error);
-    throw error;
-  }
+  return apiFetch("/users/me", {
+    method: "PUT",
+    body: JSON.stringify(userData),
+    errorMessage: "Failed to update profile",
+  });
 }
 
 // Survey
@@ -199,49 +183,18 @@ export interface SurveyData {
 }
 
 export async function submitSurvey(survey: SurveyData) {
-  try {
-    const response = await fetch(`${API_BASE_URL}/survey`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${getToken()}`
-      },
-      body: JSON.stringify(survey)
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to submit survey");
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error("Submit survey error:", error);
-    throw error;
-  }
+  return apiFetch("/survey", {
+    method: "POST",
+    body: JSON.stringify(survey),
+    errorMessage: "Failed to submit survey",
+  });
 }
 
 // Bookings
 export async function getBookings(status?: string): Promise<Booking[]> {
-  try {
-    const url = status
-      ? `${API_BASE_URL}/bookings?status=${status}`
-      : `${API_BASE_URL}/bookings`;
-
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${getToken()}`
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to fetch bookings");
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error("Get bookings error:", error);
-    throw error;
-  }
+  return apiFetch(status ? `/bookings?status=${status}` : "/bookings", {
+    errorMessage: "Failed to fetch bookings",
+  });
 }
 
 // Points
@@ -249,169 +202,57 @@ export async function getPointsBalance(): Promise<{
   available: number;
   lifetime: number;
 }> {
-  try {
-    const response = await fetch(`${API_BASE_URL}/points/balance`, {
-      headers: {
-        Authorization: `Bearer ${getToken()}`
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to fetch points balance");
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error("Get points balance error:", error);
-    throw error;
-  }
+  return apiFetch("/points/balance", {
+    errorMessage: "Failed to fetch points balance",
+  });
 }
 
 export async function getPointsHistory(): Promise<PointsTransaction[]> {
-  try {
-    const response = await fetch(`${API_BASE_URL}/points/history`, {
-      headers: {
-        Authorization: `Bearer ${getToken()}`
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to fetch points history");
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error("Get points history error:", error);
-    throw error;
-  }
+  return apiFetch("/points/history", {
+    errorMessage: "Failed to fetch points history",
+  });
 }
 
 // Rewards
 export async function getRewards(category?: string): Promise<Reward[]> {
-  try {
-    const url = category
-      ? `${API_BASE_URL}/rewards?category=${category}`
-      : `${API_BASE_URL}/rewards`;
-
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${getToken()}`
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to fetch rewards");
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error("Get rewards error:", error);
-    throw error;
-  }
+  return apiFetch(category ? `/rewards?category=${category}` : "/rewards", {
+    errorMessage: "Failed to fetch rewards",
+  });
 }
 
 export async function redeemReward(rewardId: string) {
-  try {
-    const response = await fetch(`${API_BASE_URL}/rewards/redeem`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${getToken()}`
-      },
-      body: JSON.stringify({ rewardId })
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to redeem reward");
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error("Redeem reward error:", error);
-    throw error;
-  }
+  return apiFetch("/rewards/redeem", {
+    method: "POST",
+    body: JSON.stringify({ rewardId }),
+    errorMessage: "Failed to redeem reward",
+  });
 }
 
 // Offers
 export async function getOffers(): Promise<Offer[]> {
-  try {
-    const response = await fetch(`${API_BASE_URL}/offers`, {
-      headers: {
-        Authorization: `Bearer ${getToken()}`
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to fetch offers");
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error("Get offers error:", error);
-    throw error;
-  }
+  return apiFetch("/offers", { errorMessage: "Failed to fetch offers" });
 }
 
 // Membership
 export async function getMembershipBenefits(): Promise<MembershipBenefit[]> {
-  try {
-    const response = await fetch(`${API_BASE_URL}/membership/benefits`, {
-      headers: {
-        Authorization: `Bearer ${getToken()}`
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to fetch membership benefits");
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error("Get membership benefits error:", error);
-    throw error;
-  }
+  return apiFetch("/membership/benefits", {
+    errorMessage: "Failed to fetch membership benefits",
+  });
 }
 
 export async function upgradeMembership(tier: string) {
-  try {
-    const response = await fetch(`${API_BASE_URL}/membership/upgrade`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${getToken()}`
-      },
-      body: JSON.stringify({ tier })
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to upgrade membership");
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error("Upgrade membership error:", error);
-    throw error;
-  }
+  return apiFetch("/membership/upgrade", {
+    method: "POST",
+    body: JSON.stringify({ tier }),
+    errorMessage: "Failed to upgrade membership",
+  });
 }
 
 // Payment Methods
 export async function getPaymentMethods(): Promise<PaymentMethod[]> {
-  try {
-    const response = await fetch(`${API_BASE_URL}/payment-methods`, {
-      headers: {
-        Authorization: `Bearer ${getToken()}`
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to fetch payment methods");
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error("Get payment methods error:", error);
-    throw error;
-  }
+  return apiFetch("/payment-methods", {
+    errorMessage: "Failed to fetch payment methods",
+  });
 }
 
 export async function addPaymentMethod(paymentData: {
@@ -422,91 +263,39 @@ export async function addPaymentMethod(paymentData: {
   cvv: string;
   setAsDefault: boolean;
 }) {
-  try {
-    const response = await fetch(`${API_BASE_URL}/payment-methods`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${getToken()}`
-      },
-      body: JSON.stringify(paymentData)
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to add payment method");
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error("Add payment method error:", error);
-    throw error;
-  }
+  return apiFetch("/payment-methods", {
+    method: "POST",
+    body: JSON.stringify(paymentData),
+    errorMessage: "Failed to add payment method",
+  });
 }
 
 export async function getPaymentHistory(): Promise<Payment[]> {
-  try {
-    const response = await fetch(`${API_BASE_URL}/payments/history`, {
-      headers: {
-        Authorization: `Bearer ${getToken()}`
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to fetch payment history");
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error("Get payment history error:", error);
-    throw error;
-  }
+  return apiFetch("/payments/history", {
+    errorMessage: "Failed to fetch payment history",
+  });
 }
 
 // Payments via Chapa: initialize opens a hosted checkout; the caller redirects
 // the browser to checkoutUrl. After Chapa returns the user, verify confirms it.
 export async function initializePayment(input: {
-  amount: string;
+  amount?: string;
   currency?: string;
   description?: string;
+  purpose?: string;
+  targetTier?: string;
 }): Promise<{ checkoutUrl: string; txRef: string }> {
-  try {
-    const response = await fetch(`${API_BASE_URL}/payments/initialize`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${getToken()}`
-      },
-      body: JSON.stringify(input)
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to start payment");
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error("Initialize payment error:", error);
-    throw error;
-  }
+  return apiFetch("/payments/initialize", {
+    method: "POST",
+    body: JSON.stringify(input),
+    errorMessage: "Failed to start payment",
+  });
 }
 
 export async function verifyPayment(txRef: string): Promise<Payment> {
-  try {
-    const response = await fetch(`${API_BASE_URL}/payments/verify/${txRef}`, {
-      headers: {
-        Authorization: `Bearer ${getToken()}`
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to verify payment");
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error("Verify payment error:", error);
-    throw error;
-  }
+  return apiFetch(`/payments/verify/${txRef}`, {
+    errorMessage: "Failed to verify payment",
+  });
 }
 
 // getToken is provided by ./auth (single source of truth for the JWT).

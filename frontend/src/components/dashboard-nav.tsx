@@ -41,12 +41,6 @@ export function DashboardNav() {
           title="Dashboard"
           isActive={pathname === "/dashboard"}
         />
-        {/* <NavItem
-          href="/dashboard/profile"
-          icon={<User className="h-5 w-5" />}
-          title="My Profile"
-          isActive={pathname === "/dashboard/profile"}
-        /> */}
         <NavItem
           href="/dashboard/shop"
           icon={<ShoppingBag className="h-5 w-5" />}
