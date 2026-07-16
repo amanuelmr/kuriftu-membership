@@ -14,8 +14,9 @@ import { PointsHistoryTable } from "@/components/points-history-table"
 import { MembershipUpgradeCard } from "@/components/membership-upgrade-card"
 import { ProductCard } from "@/components/product-card"
 
-// Tier ladder. Only tiers ranked ABOVE the member's current tier are offered
-// as upgrades (a Diamond member sees none — they're already at the top).
+// Tier ladder. Every purchasable tier is always shown; its rank vs. the
+// member's current tier decides whether it reads as owned, current, or an
+// available upgrade (we never hide the ones they already hold).
 const TIER_RANK: Record<string, number> = { Basic: 0, Golden: 1, Platinum: 2, Diamond: 3 }
 
 const UPGRADE_TIERS = [
@@ -69,7 +70,7 @@ export default function PointsPage() {
   const tier = user?.membershipTier ?? "Basic"
 
   const currentRank = TIER_RANK[tier] ?? 0
-  const upgradeOptions = UPGRADE_TIERS.filter((t) => t.rank > currentRank)
+  const atHighestTier = currentRank >= TIER_RANK.Diamond
 
   const [processing, setProcessing] = useState<string | null>(null)
   const [redeeming, setRedeeming] = useState<string | null>(null)
@@ -182,8 +183,8 @@ export default function PointsPage() {
             <Award className="h-6 w-6 text-primary" />
             Upgrade Your Membership
           </h2>
-          {upgradeOptions.length === 0 ? (
-            <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 dark:from-purple-950 dark:to-purple-900 dark:border-purple-800">
+          {atHighestTier && (
+            <Card className="mb-6 bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 dark:from-purple-950 dark:to-purple-900 dark:border-purple-800">
               <CardContent className="flex items-center gap-3 p-6">
                 <Award className="h-8 w-8 text-purple-700 dark:text-purple-300" />
                 <div>
@@ -196,24 +197,25 @@ export default function PointsPage() {
                 </div>
               </CardContent>
             </Card>
-          ) : (
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {upgradeOptions.map((t) => (
-                <MembershipUpgradeCard
-                  key={t.tier}
-                  tier={t.tier}
-                  pointsRequired={t.pointsRequired.toLocaleString()}
-                  currentPoints={points.toLocaleString()}
-                  benefits={t.benefits}
-                  color={t.color}
-                  canAfford={points >= t.pointsRequired}
-                  isProcessing={processing === t.tier}
-                  onUpgrade={() => upgradeWithPoints(t.tier)}
-                  onPurchase={() => purchaseUpgrade(t.tier)}
-                />
-              ))}
-            </div>
           )}
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {UPGRADE_TIERS.map((t) => (
+              <MembershipUpgradeCard
+                key={t.tier}
+                tier={t.tier}
+                pointsRequired={t.pointsRequired.toLocaleString()}
+                currentPoints={points.toLocaleString()}
+                benefits={t.benefits}
+                color={t.color}
+                canAfford={points >= t.pointsRequired}
+                current={t.rank === currentRank}
+                owned={t.rank < currentRank}
+                isProcessing={processing === t.tier}
+                onUpgrade={() => upgradeWithPoints(t.tier)}
+                onPurchase={() => purchaseUpgrade(t.tier)}
+              />
+            ))}
+          </div>
         </div>
 
         <div>

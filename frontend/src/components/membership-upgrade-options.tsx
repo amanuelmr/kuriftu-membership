@@ -76,9 +76,7 @@ export function MembershipUpgradeOptions() {
   const currentTier = user?.membershipTier ?? "Basic"
   const currentPointsNum = pointsBalance?.available ?? 0
   const currentRank = TIER_RANK[currentTier] ?? 0
-
-  // Only tiers above the member's current tier are upgrades.
-  const tiers = ALL_TIERS.filter((t) => t.rank > currentRank)
+  const atHighestTier = currentRank >= TIER_RANK.Diamond
 
   // Which tier is currently processing (name), and via which flow.
   const [processing, setProcessing] = useState<string | null>(null)
@@ -87,7 +85,7 @@ export function MembershipUpgradeOptions() {
     try {
       setProcessing(tierName)
       await upgradeMembership(tierName)
-      await Promise.all([mutate("user"), mutate("points/balance")])
+      await Promise.all([mutate("user"), mutate("points/balance"), mutate("points/history")])
       toast.success(`You're now a ${tierName} member!`)
     } catch {
       toast.error("Upgrade failed. Please try again.")
@@ -96,17 +94,15 @@ export function MembershipUpgradeOptions() {
     }
   }
 
-  async function purchaseUpgrade(tierName: string, price: string) {
+  async function purchaseUpgrade(tierName: string) {
     try {
       setProcessing(tierName)
-      const amount = price.replace(/[^0-9.]/g, "")
+      // The backend prices the upgrade from its tier catalog; we only name it.
       const { checkoutUrl } = await initializePayment({
-        amount,
-        currency: "ETB",
-        description: `${tierName} membership upgrade`,
         purpose: "membership_upgrade",
         targetTier: tierName,
       })
+      if (!checkoutUrl) throw new Error("No checkout URL returned")
       // Hand off to the Chapa hosted checkout (mock returns a local URL).
       window.location.href = checkoutUrl
     } catch {
@@ -147,7 +143,7 @@ export function MembershipUpgradeOptions() {
 
   return (
     <div className="space-y-6">
-      {tiers.length === 0 ? (
+      {atHighestTier && (
         <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 dark:from-purple-950 dark:to-purple-900 dark:border-purple-800">
           <CardContent className="flex items-center gap-3 p-6">
             <Award className="h-8 w-8 text-purple-700 dark:text-purple-300" />
@@ -155,36 +151,54 @@ export function MembershipUpgradeOptions() {
               <h3 className="text-lg font-bold text-purple-900 dark:text-purple-100">
                 You&apos;re at our highest tier — {currentTier}
               </h3>
-              <p className="text-muted-foreground">There are no higher tiers to upgrade to. Enjoy every benefit.</p>
+              <p className="text-muted-foreground">You already enjoy every benefit below. Nothing more to upgrade.</p>
             </div>
           </CardContent>
         </Card>
-      ) : (
-        <div className="grid gap-6 md:grid-cols-3">
-          {tiers.map((tier) => {
-            const canAfford = currentPointsNum >= tier.pointsRequired
-            const progressPercentage = Math.min(Math.round((currentPointsNum / tier.pointsRequired) * 100), 100)
+      )}
+      <div className="grid gap-6 md:grid-cols-3">
+        {ALL_TIERS.map((tier) => {
+          const cc = colorClasses[tier.color as keyof typeof colorClasses]
+          const isCurrent = tier.rank === currentRank
+          const isOwned = tier.rank < currentRank
+          const held = isCurrent || isOwned
+          const canAfford = currentPointsNum >= tier.pointsRequired
+          const progressPercentage = Math.min(Math.round((currentPointsNum / tier.pointsRequired) * 100), 100)
 
-            return (
-              <Card
-                key={tier.name}
-                className={`overflow-hidden transition-all ${colorClasses[tier.color as keyof typeof colorClasses].bg} ${
-                  colorClasses[tier.color as keyof typeof colorClasses].border
-                }`}
-              >
-                <CardHeader className={`pb-2 ${colorClasses[tier.color as keyof typeof colorClasses].heading}`}>
+          return (
+            <Card
+              key={tier.name}
+              className={`overflow-hidden transition-all ${cc.bg} ${cc.border} ${
+                isCurrent ? "ring-2 ring-primary" : ""
+              } ${isOwned ? "opacity-90" : ""}`}
+            >
+              <CardHeader className={`pb-2 ${cc.heading}`}>
+                <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <Award className="h-5 w-5" />
                     <CardTitle className="font-serif text-xl">{tier.name}</CardTitle>
                   </div>
-                  <CardDescription>{tier.description}</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="text-2xl font-bold">
-                    {tier.price}
-                    <span className="text-sm font-normal text-muted-foreground"> / year</span>
-                  </div>
+                  {isCurrent && (
+                    <span className="rounded-full bg-primary px-2.5 py-0.5 text-xs font-medium text-white">
+                      Current Tier
+                    </span>
+                  )}
+                  {isOwned && (
+                    <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+                      Included
+                    </span>
+                  )}
+                </div>
+                <CardDescription>{tier.description}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="text-2xl font-bold">
+                  {tier.price}
+                  <span className="text-sm font-normal text-muted-foreground"> / year</span>
+                </div>
 
+                {/* Progress toward a tier only matters for one not yet held. */}
+                {!held && (
                   <div>
                     <div className="flex justify-between text-sm mb-1">
                       <span>
@@ -192,49 +206,45 @@ export function MembershipUpgradeOptions() {
                       </span>
                       <span className="font-medium">{progressPercentage}%</span>
                     </div>
-                    <Progress
-                      value={progressPercentage}
-                      className={`h-2 ${colorClasses[tier.color as keyof typeof colorClasses].progress}`}
-                    >
-                      <div
-                        className={`h-full rounded-full ${
-                          colorClasses[tier.color as keyof typeof colorClasses].progressFill
-                        }`}
-                      />
+                    <Progress value={progressPercentage} className={`h-2 ${cc.progress}`}>
+                      <div className={`h-full rounded-full ${cc.progressFill}`} />
                     </Progress>
                   </div>
+                )}
 
-                  <ul className="space-y-2">
-                    {tier.benefits.slice(0, 4).map((benefit, index) => (
-                      <li key={index} className="flex items-start gap-2 text-sm">
-                        <Check
-                          className={`h-4 w-4 mt-0.5 ${colorClasses[tier.color as keyof typeof colorClasses].icon}`}
-                        />
-                        <span>{benefit}</span>
-                      </li>
-                    ))}
-                    {tier.benefits.length > 4 && (
-                      <li className="text-sm text-muted-foreground">+{tier.benefits.length - 4} more benefits</li>
-                    )}
-                  </ul>
-                </CardContent>
-                <CardFooter>
+                <ul className="space-y-2">
+                  {tier.benefits.slice(0, 4).map((benefit, index) => (
+                    <li key={index} className="flex items-start gap-2 text-sm">
+                      <Check className={`h-4 w-4 mt-0.5 ${cc.icon}`} />
+                      <span>{benefit}</span>
+                    </li>
+                  ))}
+                  {tier.benefits.length > 4 && (
+                    <li className="text-sm text-muted-foreground">+{tier.benefits.length - 4} more benefits</li>
+                  )}
+                </ul>
+              </CardContent>
+              <CardFooter>
+                {held ? (
+                  <Button className="w-full" variant="outline" disabled>
+                    <Check className="mr-2 h-4 w-4" />
+                    {isCurrent ? "Your Current Tier" : "Included in Your Membership"}
+                  </Button>
+                ) : (
                   <Button
-                    className={`w-full ${colorClasses[tier.color as keyof typeof colorClasses].button}`}
+                    className={`w-full ${cc.button}`}
                     disabled={processing !== null}
-                    onClick={() =>
-                      canAfford ? upgradeWithPoints(tier.name) : purchaseUpgrade(tier.name, tier.price)
-                    }
+                    onClick={() => (canAfford ? upgradeWithPoints(tier.name) : purchaseUpgrade(tier.name))}
                   >
                     {processing === tier.name && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     {canAfford ? "Upgrade with Points" : "Purchase Upgrade"}
                   </Button>
-                </CardFooter>
-              </Card>
-            )
-          })}
-        </div>
-      )}
+                )}
+              </CardFooter>
+            </Card>
+          )
+        })}
+      </div>
 
       <Card>
         <CardHeader>
