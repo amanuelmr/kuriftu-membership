@@ -140,6 +140,9 @@ func (h *PaymentHandler) InitializePayment(w http.ResponseWriter, r *http.Reques
 		case errors.Is(err, service.ErrAmountRequired):
 			writeError(w, http.StatusBadRequest, "amount is required")
 		default:
+			// Surface the underlying reason (e.g. a Chapa validation error like
+			// a rejected email) in the logs; the client message stays generic.
+			slog.Error("initialize payment failed", "userID", userID, "err", err)
 			writeError(w, http.StatusInternalServerError, "could not start payment")
 		}
 		return
