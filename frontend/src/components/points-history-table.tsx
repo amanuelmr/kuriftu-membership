@@ -3,6 +3,7 @@
 import { ArrowDownRight, ArrowUpRight } from "lucide-react"
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { TableError } from "@/components/data-error"
 import { usePointsHistory } from "@/lib/hooks"
 
 function formatDate(iso: string): string {
@@ -18,7 +19,7 @@ function withCommas(value: string): string {
 }
 
 export function PointsHistoryTable() {
-  const { pointsHistory, isLoading } = usePointsHistory()
+  const { pointsHistory, isLoading, isError, mutate } = usePointsHistory()
   const transactions = pointsHistory ?? []
 
   return (
@@ -41,14 +42,17 @@ export function PointsHistoryTable() {
               </TableCell>
             </TableRow>
           )}
-          {!isLoading && transactions.length === 0 && (
+          {!isLoading && isError && (
+            <TableError colSpan={5} message="We couldn't load your points history." onRetry={() => mutate()} />
+          )}
+          {!isLoading && !isError && transactions.length === 0 && (
             <TableRow>
               <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                 No points activity yet.
               </TableCell>
             </TableRow>
           )}
-          {transactions.map((transaction) => {
+          {!isError && transactions.map((transaction) => {
             const earned = transaction.type === "earned"
             const sign = earned ? "+" : "-"
             const category = transaction.category

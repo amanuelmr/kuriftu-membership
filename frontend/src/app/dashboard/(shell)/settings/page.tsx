@@ -17,6 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { updateUserProfile } from "@/lib/api"
 import { useUser } from "@/lib/hooks"
+import { DataError } from "@/components/data-error"
 
 // Only the fields the backend's PUT /users/me actually persists.
 const profileFormSchema = z.object({
@@ -67,7 +68,7 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState("profile")
   const [notifications, setNotifications] = useState<NotificationSettings>(notificationSettings)
   const [isLoading, setIsLoading] = useState(false)
-  const { user, mutate } = useUser()
+  const { user, mutate, isError } = useUser()
 
   const {
     register,
@@ -138,6 +139,9 @@ export default function SettingsPage() {
       </TabsList>
 
       <TabsContent value="profile" className="mt-6">
+        {isError ? (
+          <DataError message="We couldn't load your profile." onRetry={() => mutate()} />
+        ) : (
         <form onSubmit={handleSubmit(handleProfileSubmit)} className="space-y-6">
           <Card>
             <CardHeader>
@@ -203,6 +207,7 @@ export default function SettingsPage() {
             </CardFooter>
           </Card>
         </form>
+        )}
       </TabsContent>
 
       <TabsContent value="notifications" className="mt-6">

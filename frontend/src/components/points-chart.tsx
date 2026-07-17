@@ -38,10 +38,21 @@ function bucketByMonth(history: { date: string; points: string; type: string }[]
 }
 
 export function PointsChart() {
-  const { pointsHistory, isLoading } = usePointsHistory()
+  const { pointsHistory, isLoading, isError, mutate } = usePointsHistory()
   const history = pointsHistory ?? []
   const data = bucketByMonth(history)
-  const empty = !isLoading && history.length === 0
+  const empty = !isLoading && !isError && history.length === 0
+
+  if (isError) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
+        <span>We couldn&apos;t load your points chart.</span>
+        <button className="text-primary underline underline-offset-2" onClick={() => mutate()}>
+          Try again
+        </button>
+      </div>
+    )
+  }
 
   if (empty) {
     return (

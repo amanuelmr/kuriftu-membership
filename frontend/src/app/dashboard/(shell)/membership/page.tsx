@@ -10,6 +10,7 @@ import { MembershipCard } from "@/components/membership-card"
 import { MembershipBenefits } from "@/components/membership-benefits"
 import { MembershipHistory } from "@/components/membership-history"
 import { MembershipUpgradeOptions } from "@/components/membership-upgrade-options"
+import { DataError } from "@/components/data-error"
 import { useUser } from "@/lib/hooks"
 
 // Annual fee by tier (used for the "Next Payment" estimate).
@@ -21,7 +22,7 @@ const TIER_FEE: Record<string, string> = {
 }
 
 export default function MembershipPage() {
-  const { user } = useUser()
+  const { user, isError, mutate } = useUser()
 
   const tier = user?.membershipTier ?? "Basic"
   const fullName = user ? `${user.firstName} ${user.lastName}`.trim() : "Member"
@@ -45,6 +46,10 @@ export default function MembershipPage() {
         Manage your membership status, view benefits, and explore upgrade options.
       </p>
     </div>
+
+    {isError && (
+      <DataError message="We couldn't load your membership details." onRetry={() => mutate()} />
+    )}
 
     <div className="grid gap-6 md:grid-cols-3">
       <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 dark:from-purple-950 dark:to-purple-900 dark:border-purple-800">

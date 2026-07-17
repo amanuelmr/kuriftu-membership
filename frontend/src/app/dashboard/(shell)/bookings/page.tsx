@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { BookingCard } from "@/components/booking-card"
 import { DateRangePicker } from "@/components/date-range-picker"
 import { BookingFilters } from "@/components/booking-filters"
+import { DataError } from "@/components/data-error"
 import { useBookings } from "@/lib/hooks"
 import type { Booking } from "@/lib/api"
 
@@ -19,9 +20,22 @@ const TABS: Record<string, Booking["status"][]> = {
   cancelled: ["cancelled"],
 }
 
-function BookingList({ bookings, isLoading }: { bookings: Booking[]; isLoading: boolean }) {
+function BookingList({
+  bookings,
+  isLoading,
+  isError,
+  onRetry,
+}: {
+  bookings: Booking[]
+  isLoading: boolean
+  isError: boolean
+  onRetry: () => void
+}) {
   if (isLoading) {
     return <p className="text-muted-foreground py-8 text-center">Loading bookings…</p>
+  }
+  if (isError) {
+    return <DataError message="We couldn't load your bookings." onRetry={onRetry} />
   }
   if (bookings.length === 0) {
     return <p className="text-muted-foreground py-8 text-center">No bookings here yet.</p>
@@ -48,7 +62,7 @@ function BookingList({ bookings, isLoading }: { bookings: Booking[]; isLoading: 
 }
 
 export default function BookingsPage() {
-  const { bookings, isLoading } = useBookings()
+  const { bookings, isLoading, isError, mutate } = useBookings()
   const all: Booking[] = bookings ?? []
   const byTab = (tab: keyof typeof TABS) => all.filter((b) => TABS[tab].includes(b.status))
 
@@ -87,13 +101,13 @@ export default function BookingsPage() {
         <TabsTrigger value="cancelled">Cancelled</TabsTrigger>
       </TabsList>
       <TabsContent value="upcoming" className="mt-6">
-        <BookingList bookings={byTab("upcoming")} isLoading={isLoading} />
+        <BookingList bookings={byTab("upcoming")} isLoading={isLoading} isError={!!isError} onRetry={() => mutate()} />
       </TabsContent>
       <TabsContent value="past" className="mt-6">
-        <BookingList bookings={byTab("past")} isLoading={isLoading} />
+        <BookingList bookings={byTab("past")} isLoading={isLoading} isError={!!isError} onRetry={() => mutate()} />
       </TabsContent>
       <TabsContent value="cancelled" className="mt-6">
-        <BookingList bookings={byTab("cancelled")} isLoading={isLoading} />
+        <BookingList bookings={byTab("cancelled")} isLoading={isLoading} isError={!!isError} onRetry={() => mutate()} />
       </TabsContent>
     </Tabs>
     </>

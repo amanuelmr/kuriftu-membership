@@ -4,6 +4,7 @@ import { ArrowDownRight, ArrowUpRight, Calendar, Coffee, Hotel, SpadeIcon as Spa
 
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { TableError } from "@/components/data-error"
 import { usePointsHistory } from "@/lib/hooks"
 
 interface ActivityHistoryTableProps {
@@ -39,7 +40,7 @@ const categoryColors = {
 }
 
 export function ActivityHistoryTable({ category = "all", query = "" }: ActivityHistoryTableProps) {
-  const { pointsHistory, isLoading } = usePointsHistory()
+  const { pointsHistory, isLoading, isError, mutate } = usePointsHistory()
 
   const columns = category === "all" ? 5 : 4
   const search = query.trim().toLowerCase()
@@ -67,14 +68,17 @@ export function ActivityHistoryTable({ category = "all", query = "" }: ActivityH
               </TableCell>
             </TableRow>
           )}
-          {!isLoading && activities.length === 0 && (
+          {!isLoading && isError && (
+            <TableError colSpan={columns} message="We couldn't load your activity." onRetry={() => mutate()} />
+          )}
+          {!isLoading && !isError && activities.length === 0 && (
             <TableRow>
               <TableCell colSpan={columns} className="text-center text-muted-foreground py-8">
                 No activity found.
               </TableCell>
             </TableRow>
           )}
-          {activities.map((activity) => {
+          {!isError && activities.map((activity) => {
             const earned = activity.type === "earned"
             const sign = earned ? "+" : "-"
             return (
