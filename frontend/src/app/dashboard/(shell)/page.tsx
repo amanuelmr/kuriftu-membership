@@ -11,6 +11,7 @@ import { ReservationCard } from "@/components/reservation-card"
 import { ActivityItem } from "@/components/activity-item"
 import { OfferCard } from "@/components/offer-card"
 import { PointsChart } from "@/components/points-chart"
+import { DataError } from "@/components/data-error"
 import { useUser, usePointsBalance, useBookings, usePointsHistory, useOffers } from "@/lib/hooks"
 
 function shortDate(iso: string): string {
@@ -23,11 +24,15 @@ function capitalize(s: string): string {
 }
 
 export default function DashboardPage() {
-  const { user } = useUser()
-  const { pointsBalance } = usePointsBalance()
+  const { user, isError: userError, mutate: mutateUser } = useUser()
+  const { pointsBalance, isError: balanceError, mutate: mutateBalance } = usePointsBalance()
   const { bookings } = useBookings()
   const { pointsHistory } = usePointsHistory()
   const { offers } = useOffers()
+
+  // The greeting, membership card, and tier all hang off the core profile +
+  // balance fetches — if those fail, say so instead of showing a blank shell.
+  const coreError = userError || balanceError
 
   const firstName = user?.firstName ?? "there"
   const points = pointsBalance?.available ?? 0
@@ -51,6 +56,16 @@ export default function DashboardPage() {
         Manage your membership, track your points, and explore exclusive benefits.
       </p>
     </div>
+
+    {coreError && (
+      <DataError
+        message="We couldn't load your membership details. Some information below may be missing."
+        onRetry={() => {
+          mutateUser()
+          mutateBalance()
+        }}
+      />
+    )}
 
     <div className="grid gap-6 md:grid-cols-2">
       <Card className="bg-gradient-to-br from-amber-50 to-amber-100 border-amber-200 dark:from-amber-950 dark:to-amber-900 dark:border-amber-800">

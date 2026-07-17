@@ -12,10 +12,23 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/amanuelmr/kuriftu-membership/backend/internal/chapa"
 	"github.com/amanuelmr/kuriftu-membership/backend/internal/middleware"
 	"github.com/amanuelmr/kuriftu-membership/backend/internal/model"
 	"github.com/amanuelmr/kuriftu-membership/backend/internal/service"
 )
+
+// paymentRejectionMessage turns a Chapa rejection into a message the end user
+// can act on, instead of a generic failure.
+func paymentRejectionMessage(e *chapa.APIError) string {
+	if _, ok := e.Fields["email"]; ok {
+		return "Your email address wasn't accepted by our payment provider. Please use a valid email address and try again."
+	}
+	if e.Message != "" {
+		return "Payment couldn't be started: " + e.Message
+	}
+	return "Our payment provider rejected the request. Please try again later."
+}
 
 type PaymentHandler struct {
 	payments *service.PaymentService
@@ -134,14 +147,18 @@ func (h *PaymentHandler) InitializePayment(w http.ResponseWriter, r *http.Reques
 		TargetTier:  req.TargetTier,
 	})
 	if err != nil {
+		var apiErr *chapa.APIError
 		switch {
 		case errors.Is(err, service.ErrInvalidUpgrade):
 			writeError(w, http.StatusBadRequest, "invalid membership upgrade")
 		case errors.Is(err, service.ErrAmountRequired):
 			writeError(w, http.StatusBadRequest, "amount is required")
+		case errors.As(err, &apiErr):
+			// Chapa rejected the request (e.g. an invalid email). Tell the user
+			// what's wrong with a 400 rather than a blind 500.
+			slog.Error("chapa rejected initialize", "userID", userID, "err", err)
+			writeError(w, http.StatusBadRequest, paymentRejectionMessage(apiErr))
 		default:
-			// Surface the underlying reason (e.g. a Chapa validation error like
-			// a rejected email) in the logs; the client message stays generic.
 			slog.Error("initialize payment failed", "userID", userID, "err", err)
 			writeError(w, http.StatusInternalServerError, "could not start payment")
 		}

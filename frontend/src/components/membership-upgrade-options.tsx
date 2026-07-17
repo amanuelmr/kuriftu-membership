@@ -105,8 +105,8 @@ export function MembershipUpgradeOptions() {
       if (!checkoutUrl) throw new Error("No checkout URL returned")
       // Hand off to the Chapa hosted checkout (mock returns a local URL).
       window.location.href = checkoutUrl
-    } catch {
-      toast.error("Could not start payment. Please try again.")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not start payment. Please try again.")
       setProcessing(null)
     }
   }

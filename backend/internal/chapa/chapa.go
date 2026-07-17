@@ -12,9 +12,50 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 )
+
+// APIError is returned when Chapa accepts the HTTP request but reports a
+// failure in the body (e.g. a validation error such as a rejected email), as
+// opposed to a transport error. Callers can errors.As to it to surface a
+// meaningful message to the end user instead of a generic 500.
+type APIError struct {
+	StatusCode int
+	Message    string              // best-effort human-readable summary
+	Fields     map[string][]string // per-field validation errors, when present
+}
+
+func (e *APIError) Error() string {
+	if e.Message != "" {
+		return "chapa: " + e.Message
+	}
+	return "chapa: request rejected"
+}
+
+// parseChapaMessage extracts a human message (and any field errors) from
+// Chapa's "message" field, which is a plain string on some errors and an
+// object of {field: [messages]} on validation errors.
+func parseChapaMessage(raw json.RawMessage) (string, map[string][]string) {
+	if len(raw) == 0 {
+		return "", nil
+	}
+	var s string
+	if err := json.Unmarshal(raw, &s); err == nil {
+		return s, nil
+	}
+	var fields map[string][]string
+	if err := json.Unmarshal(raw, &fields); err == nil {
+		parts := make([]string, 0, len(fields))
+		for f, msgs := range fields {
+			parts = append(parts, f+": "+strings.Join(msgs, ", "))
+		}
+		sort.Strings(parts)
+		return strings.Join(parts, "; "), fields
+	}
+	return string(raw), nil
+}
 
 type Client struct {
 	secretKey string
@@ -46,8 +87,8 @@ type InitializeRequest struct {
 }
 
 type initializeResponse struct {
-	Status  string `json:"status"`
-	Message string `json:"message"`
+	Status  string          `json:"status"`
+	Message json.RawMessage `json:"message"` // string OR {field:[msgs]} on validation errors
 	Data    struct {
 		CheckoutURL string `json:"checkout_url"`
 	} `json:"data"`
@@ -88,7 +129,8 @@ func (c *Client) Initialize(ctx context.Context, req InitializeRequest) (string,
 		return "", fmt.Errorf("decode chapa response: %w", err)
 	}
 	if resp.StatusCode != http.StatusOK || out.Data.CheckoutURL == "" {
-		return "", fmt.Errorf("chapa initialize failed: %s", out.Message)
+		msg, fields := parseChapaMessage(out.Message)
+		return "", &APIError{StatusCode: resp.StatusCode, Message: msg, Fields: fields}
 	}
 	return out.Data.CheckoutURL, nil
 }

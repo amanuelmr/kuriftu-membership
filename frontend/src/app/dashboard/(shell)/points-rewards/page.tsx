@@ -13,6 +13,7 @@ import { PointsChart } from "@/components/points-chart"
 import { PointsHistoryTable } from "@/components/points-history-table"
 import { MembershipUpgradeCard } from "@/components/membership-upgrade-card"
 import { ProductCard } from "@/components/product-card"
+import { DataError } from "@/components/data-error"
 
 // Tier ladder. Every purchasable tier is always shown; its rank vs. the
 // member's current tier decides whether it reads as owned, current, or an
@@ -63,7 +64,7 @@ const UPGRADE_TIERS = [
 export default function PointsPage() {
   const { pointsBalance } = usePointsBalance()
   const { user } = useUser()
-  const { rewards, isLoading: rewardsLoading } = useRewards()
+  const { rewards, isLoading: rewardsLoading, isError: rewardsError, mutate: mutateRewards } = useRewards()
 
   const points = pointsBalance?.available ?? 0
   const lifetime = pointsBalance?.lifetime ?? 0
@@ -112,8 +113,8 @@ export default function PointsPage() {
       })
       if (!checkoutUrl) throw new Error("No checkout URL returned")
       window.location.href = checkoutUrl
-    } catch {
-      toast.error("Could not start payment. Please try again.")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not start payment. Please try again.")
       setProcessing(null)
     }
   }
@@ -225,6 +226,8 @@ export default function PointsPage() {
           </h2>
           {rewardsLoading ? (
             <p className="text-muted-foreground py-8 text-center">Loading rewards…</p>
+          ) : rewardsError ? (
+            <DataError message="We couldn't load the rewards catalog." onRetry={() => mutateRewards()} />
           ) : (rewards ?? []).length === 0 ? (
             <p className="text-muted-foreground py-8 text-center">No rewards available right now.</p>
           ) : (

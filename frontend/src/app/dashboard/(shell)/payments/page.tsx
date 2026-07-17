@@ -5,6 +5,7 @@ import { Award } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { TableError } from "@/components/data-error"
 import { usePaymentHistory } from "@/lib/hooks"
 
 // Payments are processed through Chapa's hosted checkout, so cards are entered
@@ -25,7 +26,7 @@ function formatDate(iso: string): string {
 }
 
 export default function PaymentsPage() {
-  const { paymentHistory, isLoading } = usePaymentHistory()
+  const { paymentHistory, isLoading, isError, mutate } = usePaymentHistory()
   const payments = paymentHistory ?? []
 
   return (
@@ -62,14 +63,17 @@ export default function PaymentsPage() {
                   </TableCell>
                 </TableRow>
               )}
-              {!isLoading && payments.length === 0 && (
+              {!isLoading && isError && (
+                <TableError colSpan={5} message="We couldn't load your payment history." onRetry={() => mutate()} />
+              )}
+              {!isLoading && !isError && payments.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                     No payments yet.
                   </TableCell>
                 </TableRow>
               )}
-              {payments.map((p) => (
+              {!isError && payments.map((p) => (
                 <TableRow key={p.id}>
                   <TableCell className="font-medium">{formatDate(p.date)}</TableCell>
                   <TableCell>{p.description || "Payment"}</TableCell>
