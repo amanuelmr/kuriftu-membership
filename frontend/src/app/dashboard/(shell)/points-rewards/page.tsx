@@ -113,8 +113,8 @@ export default function PointsPage() {
       })
       if (!checkoutUrl) throw new Error("No checkout URL returned")
       window.location.href = checkoutUrl
-    } catch {
-      toast.error("Could not start payment. Please try again.")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not start payment. Please try again.")
       setProcessing(null)
     }
   }
